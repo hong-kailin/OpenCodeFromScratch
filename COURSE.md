@@ -135,7 +135,7 @@ opencode-from-scratch/
 
 ## 当前状态
 
-- [/] 阶段 0：环境与基础（TypeScript + Bun 起步）— 课程已规划，待开始
+- [x] 阶段 0：环境与基础（TypeScript + Bun 起步）
 - [ ] 阶段 1：最小 Agent（一次 LLM 调用）
 - [ ] 阶段 2：流式输出
 - [ ] 阶段 3：工具循环（Agent 的核心）
