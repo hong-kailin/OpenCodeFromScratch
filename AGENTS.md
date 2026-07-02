@@ -137,6 +137,7 @@ opencode 是一个大型 TypeScript monorepo（31 个 package），技术栈为 
 
 - Conventional Commits：feat: / fix: / docs: / refactor: / test:
 - **commit message 用中文**（type 前缀保留英文，描述用中文，如 `docs: 添加项目启动文件`）
+- **不要自动提交 commit**：完成工作后告知用户，等用户确认后再提交，不要自己执行 git commit
 - 每个阶段完成后打 tag：v0.1.0、v0.2.0 ...
 - 分支：main 保持稳定，每个阶段独立分支开发
 - 分支名：最多三个词，连字符分隔，如 tool-loop、session-persist
