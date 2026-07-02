@@ -75,9 +75,38 @@ opencode-from-scratch/
 > monorepo 结构（`packages/` 多 package 分层）等到真正需要拆分抽象时再引入，当前阶段保持单 package 平铺结构。
 
 ### 阶段 1：最小 Agent（一次 LLM 调用）
-- 用 fetch 直接调 OpenAI API（不用任何 SDK）
-- 理解 messages 结构、system prompt、role
-- 产出：命令行输入一句话，AI 回复一句话（单轮、无工具、无流式）
+
+> **目标**：用最原始的 fetch 直接调 OpenAI API，理解 LLM 调用的本质——构建 messages → 发 HTTP 请求 → 解析响应。不用任何 SDK，不用 Effect，不用流式。
+>
+> **产出**：命令行输入一句话，AI 回复一句话（单轮、无工具、无流式）。
+
+#### 课程
+
+- **1.1 OpenAI API 初探：messages 结构**
+  - LLM API 的本质：发 HTTP 请求，拿 JSON 响应（类比调 REST API）
+  - messages 数组：role（system/user/assistant）+ content
+  - system prompt：给 AI 设定角色和规则
+  - 对照 opencode：看 `session/system.ts` 怎么组装 system prompt
+  - 用 curl 手动调一次 API，直观感受请求和响应
+
+- **1.2 用 fetch 调 API：async/await 与 Promise**
+  - TS 的 fetch（类比 Python 的 requests/httpx）
+  - Promise 和 async/await（类比 Python 的 asyncio）
+  - 定义消息类型：interface Message { role, content }
+  - 构建 messages 数组，发 POST 请求，解析 JSON 响应
+  - 教 debug：API 报错怎么读（401 鉴权、429 限流、400 参数错误）
+
+- **1.3 命令行交互：多轮对话**
+  - 用 readline 模块读用户输入（类比 Python input()）
+  - 维护 messages 历史：每次把 AI 回复加回 messages 数组
+  - 循环：用户输入 → 调 API → 打印回复 → 继续
+  - 对照 opencode：看 `session/prompt.ts` 的 runLoop 理解 agent loop 雏形
+
+- **1.4 阶段验收：能对话的 agent + 工程思维总结**
+  - 跑通多轮对话：输入问题，AI 回答，能连续对话
+  - 对照 opencode：我们的 fetch 直调 vs opencode 的 LLM 包抽象（Route 四轴模型）
+  - 工程思维：为什么先裸 fetch 再抽象？什么时候该引入 SDK？
+  - 预告阶段 2：流式输出（逐字打印而不是等全部生成完）
 
 ### 阶段 2：流式输出
 - 理解 SSE（Server-Sent Events）流式响应
@@ -147,4 +176,4 @@ opencode-from-scratch/
 - [ ] 阶段 9：TUI 终端界面（选做）
 - [ ] 阶段 10：高级特性（选做）
 
-> **下一步**：开始阶段 0 的第 0.1 课「Bun 起步」。
+> **下一步**：开始阶段 1 的第 1.1 课「OpenAI API 初探」。
