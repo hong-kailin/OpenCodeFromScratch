@@ -5,10 +5,59 @@
 ## 学习路线图
 
 ### 阶段 0：环境与基础（TypeScript + Bun 起步）
-- 安装 Bun，理解 .ts 文件直接运行
-- TypeScript 基础：类型标注、interface vs type、泛型（对照 Python type hints）
-- 项目脚手架：package.json、tsconfig.json、目录结构
-- 第一个 console.log 程序
+
+> **目标**：搭好开发环境，掌握 TypeScript + Bun 的基本开发节奏和调试方法，产出一个能跑的最小程序。
+>
+> **产出**：`bun run src/index.ts` 打印 "hello opencode"，并理解项目配置文件的作用。
+
+#### 课程
+
+- **0.1 Bun 起步：JS 运行时与包管理器**
+  - Bun 是什么：JS 运行时 + 包管理器（类比 Python 解释器 + pip/uv）
+  - 安装与验证：`bun --version`
+  - .ts 文件直接运行（无需编译步骤，类比 `python script.py`）
+  - 第一个程序：`console.log("hello")`（类比 `print()`）
+  - 教 debug：运行报错怎么读、`console.log` 打点调试
+
+- **0.2 TypeScript 初步：类型系统（对照 Python type hints）**
+  - 声明：本课**不是**完整的 TS 语言教程，只带你建立初步印象。后面章节用到的新 TS 概念/语法会随用随讲
+  - 类型标注：`const x: number = 1`（对照 `x: int = 1`）
+  - 常用类型：string / number / boolean / array / union（`string | number`）
+  - interface vs type：定义对象形状（对照 dataclass / TypedDict）
+  - 泛型基础：`function foo<T>(x: T): T`（对照 `def foo[T](x: T) -> T`）
+  - 重点：agent 开发会频繁遇到的类型（interface、union、Record、泛型）
+
+- **0.3 项目脚手架：package.json 与 tsconfig.json**
+  - package.json 是什么（对照 pyproject.toml）：依赖、devDependencies、scripts
+  - `bun install` 安装依赖（对照 `pip install`）
+  - tsconfig.json 是什么（对照 mypy.ini 的角色）：target、module、strict、paths
+  - 对照 opencode：`extends: "@tsconfig/bun"`、`paths: {"@/*": ["./src/*"]}` 路径别名
+  - typecheck 命令：`bun run typecheck` / `tsc --noEmit`
+
+- **0.4 VSCode 调试：断点与调试器**
+  - 用 VSCode 打开项目，安装 Bun 扩展
+  - 设置断点：行号左侧点击（对照 PyCharm/VSCode Python 断点）
+  - launch.json 配置：用 Bun 调试 TS 文件
+  - 调试面板：变量、调用栈、Watch、Step Over/Into/Out（对照 Python 调试器）
+  - 教 debug：条件断点、日志断点（不暂停只打印），什么时候用断点 vs console.log
+
+- **0.5 阶段验收：跑起来 + 工程思维总结**
+  - 跑通 `bun run src/index.ts`，输出 "hello opencode"
+  - 验收清单：Bun 安装 ✓、TS 运行 ✓、package.json 配置 ✓、tsconfig ✓、VSCode 调试 ✓
+  - 工程思维总结：为什么 opencode 选 Bun？为什么用 TypeScript？
+  - 对照 opencode 真实入口：`packages/opencode/src/index.ts`（yargs CLI）
+
+#### 阶段产出
+
+```
+opencode-from-scratch/
+├── package.json          # 项目配置（依赖、scripts）
+├── tsconfig.json         # TS 编译配置
+└── src/
+    └── index.ts          # 入口：console.log("hello opencode")
+```
+
+> monorepo 结构（`packages/` 多 package 分层）等到真正需要拆分抽象时再引入，当前阶段保持单 package 平铺结构。
 
 ### 阶段 1：最小 Agent（一次 LLM 调用）
 - 用 fetch 直接调 OpenAI API（不用任何 SDK）
@@ -71,7 +120,7 @@
 
 ## 当前状态
 
-- [ ] 阶段 0：环境与基础（TypeScript + Bun 起步）
+- [/] 阶段 0：环境与基础（TypeScript + Bun 起步）— 课程已规划，待开始
 - [ ] 阶段 1：最小 Agent（一次 LLM 调用）
 - [ ] 阶段 2：流式输出
 - [ ] 阶段 3：工具循环（Agent 的核心）
@@ -83,4 +132,4 @@
 - [ ] 阶段 9：TUI 终端界面（选做）
 - [ ] 阶段 10：高级特性（选做）
 
-> **下一步**：从阶段 0 开始。进入前细化阶段 0 的具体课程内容。
+> **下一步**：开始阶段 0 的第 0.1 课「Bun 起步」。
