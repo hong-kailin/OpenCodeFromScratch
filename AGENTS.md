@@ -145,18 +145,17 @@ opencode 是一个大型 TypeScript monorepo（31 个 package），技术栈为 
 ### 文件组织
 
 - **项目代码**：采用与 opencode 一致的 monorepo 结构，代码写在 `packages/<package-name>/src/` 下（最终复刻 opencode 的 31 个 package 分层）。但渐进式起步——前期阶段先在一个 package 内推进，等某层抽象真正需要拆分时再按 opencode 的分层拆出独立 package
-- **课程文档**：每个阶段在 `docs/` 下创建编号文件夹（如 `docs/00-env-basics/`），阶段内每节小课再创建子文件夹（如 `docs/00-env-basics/01-bun-basics/`）
+- **课程文档**：每个阶段在 `docs/` 下创建编号文件夹（如 `docs/01-minimal-agent/`），阶段内每节小课再创建子文件夹（如 `docs/01-minimal-agent/01-config-file/`），小课文件夹内放带序号的 `.md` 文件（如 `01-config-file.md`）
 - **源码参考**：opencode/ 目录只读，不修改，用于对照学习
 
 ### 文档拆分
 
 > 原则：**一个文件只讲一件事。** 内容堆在一起会让人望而生畏，拆开读才轻松。
 
-- 每节小课有独立文件夹，文件夹内放该课的文档（`.md`）和其他必要文件（图片、示例数据、教学代码等）
-- 一节课只讲一个知识点时，直接用 `README.md` 承载正文
-- 一节课涉及多个概念时，拆成多个 `.md` 文件，`README.md` 只做目录导航（列出文件清单和阅读顺序），不承载正文
-- 按序号编号：小课文件夹和拆出的文件都用数字前缀排序，如 `docs/00-env-basics/01-bun-basics/`、`docs/00-env-basics/02-typescript-types/`
-- 判断拆分时机：一个 `README.md` 超过约 150 行，或出现"接下来讲……"这种明显的话题切换时，就该拆
+- 每节小课有独立子文件夹（如 `docs/01-minimal-agent/01-config-file/`），文件夹内放该课的 `.md` 文件
+- 一节课只讲一个知识点时，文件夹内用一个 `.md` 文件承载正文
+- 一节课涉及多个概念时，拆成多个带序号的 `.md` 文件（如 `01-messages.md`、`02-curl-demo.md`），各自聚焦一个知识点
+- 判断拆分时机：一个 `.md` 超过约 150 行，或出现明显话题切换时就拆
 
 ### 教学代码
 
