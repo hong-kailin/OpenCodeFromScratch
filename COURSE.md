@@ -27,23 +27,38 @@
   - 泛型基础：`function foo<T>(x: T): T`（对照 `def foo[T](x: T) -> T`）
   - 重点：agent 开发会频繁遇到的类型（interface、union、Record、泛型）
 
-- **0.3 项目脚手架：package.json 与 tsconfig.json**
-  - package.json 是什么（对照 pyproject.toml）：依赖、devDependencies、scripts
+- **0.3 模块系统：import 与 export**
+  - 为什么需要模块：代码长了要拆文件（对照 Python 的 import）
+  - export：导出函数/类型/变量
+  - import：导入其他文件的导出
+  - 默认导出 vs 命名导出
+  - 对照 opencode：看源码里的 import 写法（`@/tool/...` 路径别名预告）
+
+- **0.4 package.json：项目配置与依赖管理**
+  - package.json 是什么（对照 pyproject.toml）：name、version、type、scripts
   - `bun install` 安装依赖（对照 `pip install`）
-  - tsconfig.json 是什么（对照 mypy.ini 的角色）：target、module、strict、paths
-  - 对照 opencode：`extends: "@tsconfig/bun"`、`paths: {"@/*": ["./src/*"]}` 路径别名
+  - dependencies vs devDependencies
+  - scripts：自定义命令（`bun run dev`）
+  - 从单文件到多文件项目：引入第一个第三方依赖
+
+- **0.5 tsconfig.json：TypeScript 编译配置**
+  - tsconfig.json 是什么（对照 mypy.ini 的角色）
+  - 为什么需要它：`bun run` 能直接跑 .ts，为什么还要配置
+  - extends 继承预设（`@tsconfig/bun`）
+  - strict、noEmit、types、paths 路径别名
+  - include/exclude：限定检查范围
   - typecheck 命令：`bun run typecheck` / `tsc --noEmit`
 
-- **0.4 VSCode 调试：断点与调试器**
+- **0.6 VSCode 调试：断点与调试器**
   - 用 VSCode 打开项目，安装 Bun 扩展
   - 设置断点：行号左侧点击（对照 PyCharm/VSCode Python 断点）
   - launch.json 配置：用 Bun 调试 TS 文件
   - 调试面板：变量、调用栈、Watch、Step Over/Into/Out（对照 Python 调试器）
   - 教 debug：条件断点、日志断点（不暂停只打印），什么时候用断点 vs console.log
 
-- **0.5 阶段验收：跑起来 + 工程思维总结**
+- **0.7 阶段验收：跑起来 + 工程思维总结**
   - 跑通 `bun run src/index.ts`，输出 "hello opencode"
-  - 验收清单：Bun 安装 ✓、TS 运行 ✓、package.json 配置 ✓、tsconfig ✓、VSCode 调试 ✓
+  - 验收清单：Bun 安装 ✓、TS 运行 ✓、import ✓、package.json ✓、tsconfig ✓、VSCode 调试 ✓
   - 工程思维总结：为什么 opencode 选 Bun？为什么用 TypeScript？
   - 对照 opencode 真实入口：`packages/opencode/src/index.ts`（yargs CLI）
 
