@@ -1,9 +1,9 @@
 // src/index.ts
-// 入口：多轮对话循环
+// 入口：多轮对话循环（流式版）
 // 跑法：bun run src/index.ts
 
 import type { Message } from "./types"
-import { loadConfig, chat } from "./llm"
+import { loadConfig, chatStream } from "./llm"
 
 // 1. 读配置
 const config = await loadConfig()
@@ -23,10 +23,6 @@ const messages: Message[] = [
 // 用法：在 .vscode/launch.json 的 "调试（预设输入）" 配置里设置 env：
 //       "env": { "DEBUG_INPUTS": "[\"你好\", \"1+1等于几\", \"退出\"]" }
 //       这是一个 JSON 字符串数组，程序会按顺序逐条当作用户输入。
-//
-// 为什么用 JSON.parse 而不是直接用数组？
-// 因为环境变量只能是字符串。JSON.parse 把字符串还原成数组。
-// as string[] 告诉 TS：我确定解析出来是字符串数组（类比 Python 的 type hint）。
 const debugInputs = process.env.DEBUG_INPUTS
   ? (JSON.parse(process.env.DEBUG_INPUTS) as string[])
   : null
@@ -43,11 +39,15 @@ while (true) {
   // 把用户输入加入历史
   messages.push({ role: "user", content: input })
 
-  // 调 API（带上全部历史，AI 才能"记住"之前说过什么）
-  const reply = await chat(messages, config)
+  // 流式调 API（带上全部历史，AI 才能"记住"之前说过什么）
+  // 和阶段 1 的区别：用 chatStream 代替 chat，逐字打印
+  process.stdout.write("AI: ") // 先打印前缀（不换行）
+  const reply = await chatStream(messages, config, (text) => {
+    // 回调函数：每收到一段文本就立刻打印（不换行，打字机效果）
+    process.stdout.write(text)
+  })
+  console.log() // 回复结束，换行
 
-  // 把 AI 回复加入历史（下次请求带上）
+  // 把 AI 回复加入历史（下次请求带上，AI 才能"记住"之前说过什么）
   messages.push({ role: "assistant", content: reply })
-
-  console.log("AI:", reply)
 }
