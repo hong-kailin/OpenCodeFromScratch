@@ -4,7 +4,17 @@
     {
       "type": "bun",
       "request": "launch",
-      "name": "Debug Current File",
+      "name": "调试（预设输入）",
+      "program": "src/index.ts",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "DEBUG_INPUTS": "[\"你好\", \"1+1等于几\", \"退出\"]"
+      }
+    },
+    {
+      "type": "bun",
+      "request": "launch",
+      "name": "调试当前文件",
       "program": "${file}",
       "cwd": "${workspaceFolder}"
     }
