@@ -147,11 +147,41 @@ opencode-from-scratch/
   - 预告阶段 3：工具循环（agent 的核心）
 
 ### 阶段 3：工具循环（Agent 的核心）
-- 定义 Tool 接口（id、description、parameters、execute）
-- 实现第一个工具：read（读文件）
-- 实现 tool loop：LLM 返回工具调用 → 执行 → 结果喂回 → 继续
-- 理解 max_steps 停止条件
-- 产出：AI 能读取本地文件并回答关于文件的问题
+
+> **目标**：让 LLM 能调用工具——实现 read 工具，LLM 返回工具调用时执行工具、把结果喂回、继续循环，直到 LLM 不再调用工具。
+>
+> **产出**：问 AI"src/index.ts 里写了什么"，AI 自动调用 read 工具读文件，回答文件内容。
+
+#### 课程
+
+- **3.1 Tool Calling 是什么：LLM 怎么调用工具**
+  - LLM 本身不能读文件/执行命令，但它能"告诉你"要做什么
+  - OpenAI API 的 function calling：请求加 `tools` 字段，响应返回 `tool_calls`
+  - tool_calls 格式：`{id, function: {name, arguments}}`
+  - tool 结果以 `role: "tool"` 消息喂回
+  - 用 curl 手动调一次带 tools 的请求，看 LLM 怎么返回 tool_calls
+  - 对照 opencode：看 `tool/tool.ts` 的 Def 接口
+
+- **3.2 定义 Tool 接口 + 实现 read 工具**
+  - 定义我们的 Tool 接口：`{id, description, parameters, execute}`
+  - 实现 read 工具：读文件，返回带行号的文本
+  - 工具描述：LLM 看的说明文本
+  - 对照 opencode：看 `tool/read.ts` 和 `tool/read.txt`
+  - JSON Schema：把工具的参数格式发给 LLM
+
+- **3.3 实现 tool loop：检测、执行、喂回、循环**
+  - 修改 chatStream：检测响应里的 tool_calls
+  - 执行工具：根据 tool name 找到对应工具，调用 execute
+  - 喂回结果：把工具结果以 `role: "tool"` 消息加入 messages
+  - 循环：继续调 LLM，直到它不再返回 tool_calls
+  - max_steps：防止无限循环
+  - 对照 opencode：看 `session/prompt.ts` 的 runLoop
+
+- **3.4 阶段验收：能读文件的 agent + 工程思维总结**
+  - 跑通：问 AI "src/llm.ts 里写了什么" → AI 调 read 工具 → 回答内容
+  - 对照 opencode：我们的 tool loop vs opencode 的 runLoop
+  - 工程思维：tool loop 是 agent 的本质——LLM 是大脑，工具是手脚
+  - 预告阶段 4：更多工具（write、edit、bash 等）
 
 ### 阶段 4：工具集
 - 逐步实现：write、edit、bash、grep、glob、task、todowrite、webfetch
