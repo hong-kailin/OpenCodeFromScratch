@@ -114,9 +114,37 @@ opencode-from-scratch/
   - 预告阶段 2：流式输出（逐字打印而不是等全部生成完）
 
 ### 阶段 2：流式输出
-- 理解 SSE（Server-Sent Events）流式响应
-- 用 Effect Stream 封装流式读取（首次引入 Effect）
-- 产出：AI 回复逐字打印到终端
+
+> **目标**：把"等全部生成完再打印"改成"逐字打印"，理解 SSE 流式响应和 TS 的流式读取。
+>
+> **产出**：AI 回复逐字打印到终端，像打字机一样。
+
+#### 课程
+
+- **2.1 流式输出是什么：SSE 格式**
+  - 非流式 vs 流式的区别：等全部生成 vs 逐字返回
+  - 请求加 `stream: true`，响应变成 SSE 格式（`data: {JSON}\n\n`）
+  - 用 curl `--no-buffer` 手动调一次流式 API，看逐块返回
+  - 对照 opencode：它始终用 `stream: true`，不走非流式
+
+- **2.2 用 fetch 读流式响应：ReadableStream**
+  - fetch 返回的 response.body 是 ReadableStream（流式读取）
+  - 用 async iterator 逐块读取（`for await (const chunk of response.body)`）
+  - 解析 SSE：按 `data: ` 前缀提取 JSON，遇到 `[DONE]` 结束
+  - 提取 `choices[0].delta.content` 拿到文本增量
+  - 教 debug：流式读取卡住、乱码等常见问题
+
+- **2.3 封装流式 chat 函数 + 集成到多轮对话**
+  - 把流式读取封装成 `chatStream()` 函数
+  - 逐字打印到终端（process.stdout.write 不换行）
+  - 收集完整文本加入 messages 历史
+  - 替换阶段 1 的 `chat()` 为流式版本
+
+- **2.4 阶段验收：打字机效果 + 工程思维总结**
+  - 跑通：AI 回复逐字打印
+  - 对照 opencode：我们的 ReadableStream vs opencode 的 Effect Stream
+  - 工程思维：为什么 opencode 始终用流式？流式带来的复杂度
+  - 预告阶段 3：工具循环（agent 的核心）
 
 ### 阶段 3：工具循环（Agent 的核心）
 - 定义 Tool 接口（id、description、parameters、execute）
