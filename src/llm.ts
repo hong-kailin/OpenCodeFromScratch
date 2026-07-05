@@ -1,8 +1,10 @@
 // src/llm.ts
-// LLM 客户端：读配置 + 调 API（非流式 + 流式）
+// LLM 客户端：读配置 + 调 API（非流式 + 流式 + 工具调用）
 // 跑法：bun run src/index.ts（index.ts 会 import 这个模块）
 
-import type { Message } from "./types"
+import type { Message, ToolCall } from "./types"
+import type { Tool } from "./tool/tool"
+import { toolToOpenAIFormat } from "./tool/tool"
 
 // 读取 opencode.json 配置，解析出 baseURL、apiKey、modelID
 export async function loadConfig(): Promise<{ baseURL: string; apiKey: string; modelID: string }> {
@@ -122,4 +124,112 @@ export async function chatStream(
 
   // 返回完整文本（调用者用它加入 messages 历史）
   return fullText
+}
+
+// ── 带工具调用的流式版本 ──────────────────────────────────────
+//
+// 和 chatStream 的区别：
+// 1. 请求 body 多了 tools 字段（告诉 LLM 有哪些工具可用）
+// 2. 响应里除了 delta.content（文本），还可能有 delta.tool_calls（工具调用）
+// 3. tool_calls 的 arguments 是分块流式到达的，要按 index 累积拼接
+// 4. 返回 { text, toolCalls }：文本 + 工具调用列表
+//
+// 调用者根据 toolCalls 是否为空决定：
+// - toolCalls 为空 → LLM 说完了，结束循环
+// - toolCalls 不为空 → 执行工具，喂回结果，继续循环
+
+// chatWithTools 的返回值
+export interface ChatResult {
+  text: string // LLM 回复的完整文本（可能为空，如果有 tool_calls）
+  toolCalls: ToolCall[] // LLM 要调用的工具列表（可能为空）
+}
+
+export async function chatWithTools(
+  messages: Message[],
+  config: { baseURL: string; apiKey: string; modelID: string },
+  tools: Tool[],
+  onChunk: (text: string) => void,
+): Promise<ChatResult> {
+  // 发流式请求（和 chatStream 的区别：body 里多了 tools）
+  const response = await fetch(`${config.baseURL}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${config.apiKey}`,
+    },
+    body: JSON.stringify({
+      model: config.modelID,
+      stream: true,
+      messages,
+      // tools：把我们的 Tool 定义转成 OpenAI API 格式
+      tools: tools.map(toolToOpenAIFormat),
+    }),
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`API 错误 ${response.status}: ${errorText}`)
+  }
+
+  const decoder = new TextDecoder()
+  let fullText = ""
+
+  // toolCallsMap：按 index 累积工具调用
+  // 为什么用 Map？因为 LLM 可能同时调多个工具，用 index 区分（0, 1, 2...）
+  // 每个 tool_call 的 arguments 是分块到达的，要拼接
+  const toolCallsMap = new Map<number, { id: string; name: string; arguments: string }>()
+
+  for await (const chunk of response.body!) {
+    const text = decoder.decode(chunk, { stream: true })
+
+    for (const line of text.split("\n")) {
+      if (!line.startsWith("data: ")) continue
+
+      const data = line.slice(6)
+      if (data === "[DONE]") continue
+
+      const json = JSON.parse(data)
+      const delta = json.choices[0]?.delta
+
+      // 1. 处理文本增量（和 chatStream 一样）
+      const content = delta?.content
+      if (content) {
+        onChunk(content)
+        fullText += content
+      }
+
+      // 2. 处理工具调用增量（chatStream 没有的部分）
+      // tool_calls 的 arguments 是分块流式到达的：
+      // 第一个 delta：有 id 和 name，arguments 是空字符串
+      // 后续 delta：只有 arguments 的片段，要拼接
+      if (delta?.tool_calls) {
+        for (const tc of delta.tool_calls) {
+          const existing = toolCallsMap.get(tc.index)
+          if (existing) {
+            // 已有：拼接 arguments 片段
+            if (tc.function?.arguments) existing.arguments += tc.function.arguments
+          } else {
+            // 新的：记录 id 和 name
+            toolCallsMap.set(tc.index, {
+              id: tc.id,
+              name: tc.function?.name || "",
+              arguments: tc.function?.arguments || "",
+            })
+          }
+        }
+      }
+    }
+  }
+
+  // 把 Map 转成数组
+  const toolCalls: ToolCall[] = Array.from(toolCallsMap.values()).map((tc) => ({
+    id: tc.id,
+    type: "function" as const,
+    function: {
+      name: tc.name,
+      arguments: tc.arguments,
+    },
+  }))
+
+  return { text: fullText, toolCalls }
 }

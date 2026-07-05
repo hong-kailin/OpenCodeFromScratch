@@ -8,7 +8,7 @@
       "program": "src/index.ts",
       "cwd": "${workspaceFolder}",
       "env": {
-        "DEBUG_INPUTS": "[\"你好\", \"1+1等于几\", \"退出\"]"
+        "DEBUG_INPUTS": "[\"src/index.ts 里写了什么？\"]"
       }
     },
     {
