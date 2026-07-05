@@ -10,6 +10,7 @@ import { editTool } from "./tool/edit"
 import { bashTool } from "./tool/bash"
 import { globTool } from "./tool/glob"
 import { grepTool } from "./tool/grep"
+import { truncate } from "./tool/truncate"
 import type { Tool } from "./tool/tool"
 
 // 1. 读配置
@@ -93,7 +94,7 @@ while (true) {
       messages.push({
         role: "tool",
         tool_call_id: tc.id,
-        content: output,
+        content: truncate(output),
       })
     }
 

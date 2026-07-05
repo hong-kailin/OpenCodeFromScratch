@@ -261,7 +261,7 @@ opencode-from-scratch/
 - [x] 阶段 1：最小 Agent（一次 LLM 调用）
 - [x] 阶段 2：流式输出
 - [x] 阶段 3：工具循环（Agent 的核心）
-- [ ] 阶段 4：工具集
+- [x] 阶段 4：工具集
 - [ ] 阶段 5：Session 持久化
 - [ ] 阶段 6：Provider 抽象
 - [ ] 阶段 7：System Context & AGENTS.md
@@ -269,4 +269,4 @@ opencode-from-scratch/
 - [ ] 阶段 9：TUI 终端界面（选做）
 - [ ] 阶段 10：高级特性（选做）
 
-> **下一步**：开始阶段 4「工具集」—— 实现 write、edit、bash 等更多工具。
+> **下一步**：开始阶段 5「Session 持久化」—— SQLite + Drizzle，对话历史存数据库。
