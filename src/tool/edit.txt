@@ -1,0 +1,13 @@
+精确字符串替换工具，用于编辑已有文件。
+
+参数：
+- filePath：文件路径
+- oldString：要替换的原文（必须精确匹配，包括空格和换行）
+- newString：替换后的新文本
+- replaceAll：是否替换所有匹配（默认 false，只替换第一个）
+
+注意：
+- 编辑前请先用 read 工具读取文件内容
+- 如果 oldString 在文件中找不到，会报错
+- 如果 oldString 有多处匹配且未设 replaceAll，会报错——请提供更多上下文使匹配唯一
+- 用 replaceAll 重命名变量等需要全部替换的场景

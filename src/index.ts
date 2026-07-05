@@ -5,6 +5,8 @@
 import type { Message } from "./types"
 import { loadConfig, chatWithTools } from "./llm"
 import { readTool } from "./tool/read"
+import { writeTool } from "./tool/write"
+import { editTool } from "./tool/edit"
 import type { Tool } from "./tool/tool"
 
 // 1. 读配置
@@ -12,11 +14,11 @@ const config = await loadConfig()
 
 // 2. 注册工具：把所有可用工具放一个数组里
 // 对照 opencode: 它用 ToolRegistry 管理，我们简化为数组
-const tools: Tool[] = [readTool]
+const tools: Tool[] = [readTool, writeTool, editTool]
 
 // 3. messages 历史
 const messages: Message[] = [
-  { role: "system", content: "你是一个简洁的助手，用中文回答。你可以使用 read 工具读取本地文件。" },
+  { role: "system", content: "你是一个简洁的助手，用中文回答。你可以使用 read、write、edit 工具读取、写入和编辑文件。" },
 ]
 
 // ── 调试模式 ──────────────────────────────────────────────
