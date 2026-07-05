@@ -142,7 +142,7 @@ sqlite.run(`CREATE TABLE IF NOT EXISTS message (...)`)
 
 ## 跑一下
 
-看教学代码 [`src/db-demo.ts`](../../../src/db-demo.ts)：
+看教学代码 `src/db-demo.ts`：
 
 ```bash
 # 运行演示（创建数据库、插入 session、查询）
@@ -154,6 +154,8 @@ sqlite3 opencode-from-scratch.db
 SELECT * FROM session;
 .quit
 ```
+
+> 教学代码 `src/db-demo.ts` 已清理，可通过 git 历史查看。
 
 ## 对照 opencode
 

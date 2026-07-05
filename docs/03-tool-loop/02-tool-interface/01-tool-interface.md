@@ -145,13 +145,15 @@ export const readTool: Tool = {
 
 ## 跑一下
 
-看教学代码 [`src/tool-demo.ts`](../../../src/tool-demo.ts)，直接调用 read 工具读自己的文件：
+直接调用 read 工具读自己的文件：
 
 ```bash
 bun run src/tool-demo.ts
 ```
 
 期望输出 read 工具读到的文件内容（带行号）。
+
+> 教学代码 `src/tool-demo.ts` 已清理，可通过 git 历史查看。
 
 ## 对照 opencode
 

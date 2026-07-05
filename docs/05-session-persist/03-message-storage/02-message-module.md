@@ -8,6 +8,8 @@
 bun run src/message-demo.ts
 ```
 
+> 教学代码 `src/message-demo.ts` 已清理，可通过 git 历史查看。
+
 演示内容：创建 session → 保存 4 种消息（user、assistant 带 tool_calls、tool 结果、assistant 回复）→ 加载全部消息 → 验证 JSON 序列化/反序列化正确。
 
 ## 我们的实现

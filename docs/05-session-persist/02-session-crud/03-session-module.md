@@ -29,6 +29,8 @@ interface Session {
 
 代码在 `src/session.ts`，用 `bun run src/session-demo.ts` 跑演示。
 
+> 教学代码 `src/session-demo.ts` 已清理，可通过 git 历史查看。
+
 关键点：
 1. **`createSession`**：生成 ID → INSERT → 返回 session 对象
 2. **`listSessions`**：SELECT + `orderBy(desc(time_updated))` → 返回数组
@@ -44,6 +46,8 @@ interface Session {
 ```bash
 bun run src/session-demo.ts
 ```
+
+> 教学代码 `src/session-demo.ts` 已清理，可通过 git 历史查看。
 
 会执行：
 1. 创建 3 个 session
