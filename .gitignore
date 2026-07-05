@@ -2,3 +2,6 @@ node_modules/
 *.log
 .DS_Store
 opencode.json
+*.db
+*.db-wal
+*.db-shm

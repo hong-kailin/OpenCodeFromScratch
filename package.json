@@ -13,6 +13,7 @@
     "typescript": "latest"
   },
   "dependencies": {
+    "drizzle-orm": "^0.45.2",
     "yargs": "^18.0.0"
   }
 }
