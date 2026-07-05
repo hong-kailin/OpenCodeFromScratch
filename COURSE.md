@@ -263,10 +263,35 @@ opencode-from-scratch/
   - 预告阶段 6：Provider 抽象
 
 ### 阶段 6：Provider 抽象
-- 从硬编码 OpenAI 抽象出 Provider 接口
-- 接入 Anthropic（Claude）
-- 理解 opencode 的 Route 四轴模型（protocol + endpoint + auth + framing）
-- 产出：支持多个 LLM provider，可切换
+
+> **目标**：从硬编码 OpenAI 格式抽象出 Provider 接口，理解 opencode 的 Route 四轴模型（Protocol + Endpoint + Auth + Framing），学会正交组合的设计思想。
+>
+> **产出**：Provider 接口 + OpenAI provider 实现，配置文件支持多 provider 切换，Anthropic provider 代码作为参考（不跑）。
+
+#### 课程
+
+- **6.1 为什么需要 Provider 抽象 + 接口设计**
+  - 当前代码的问题：chatWithTools 硬编码 OpenAI 格式（URL、请求体、响应解析）
+  - N×M×K 问题：N 个 provider × M 种 API 协议 × K 种认证方式
+  - opencode 的解法：Route 四轴正交分解（Protocol + Endpoint + Auth + Framing）
+  - 定义我们的 Provider 接口：`chatWithTools(messages, tools, onChunk) → ChatResult`
+  - 把 llm.ts 重构成 OpenAIProvider，agent 代码通过接口调用
+  - 配置文件支持多 provider：opencode.json 里写多个 provider，model 字段切换
+
+- **6.2 Anthropic Messages API：不同的协议**
+  - OpenAI Chat Completions vs Anthropic Messages API 的差异
+  - 消息格式差异（system 独立字段 vs 在 messages 里）
+  - tool calls 差异（tool_calls 数组 vs content blocks）
+  - 流式差异（SSE delta vs content_block_delta 事件类型）
+  - 写 Anthropic Provider 代码（不跑，纯讲设计）
+  - 对照 opencode：Protocol 层怎么隔离这些差异
+
+- **6.3 对照 opencode Route 四轴模型 + 阶段验收**
+  - 我们的 Provider 接口 vs opencode 的 Route（Protocol + Endpoint + Auth + Framing）
+  - 正交组合的威力：DeepSeek/TogetherAI/Cerebras 复用 OpenAI protocol 只需 3 行
+  - 简单接口 vs Route 模型的 trade-off：什么时候该演进
+  - 验收：typecheck 通过、provider 可切换、OpenAI provider 跑通
+  - 工程思维：正交分解——把 N×M×K 降成 N+M+K
 
 ### 阶段 7：System Context & AGENTS.md
 - 实现 AGENTS.md 文件加载（项目级 + 全局级）

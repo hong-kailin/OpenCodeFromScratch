@@ -2,9 +2,12 @@
 // 入口：多轮对话 + 工具循环 + session 持久化
 // 跑法：bun run src/index.ts
 // 5.4 课改造：启动时选择新建/恢复 session，对话中自动保存消息到数据库
+// 6.1 课改造：通过 Provider 接口调用 LLM，不再直接调 chatWithTools
 
 import type { Message } from "./types"
-import { loadConfig, chatWithTools } from "./llm"
+import { loadConfig } from "./llm"
+import { createOpenAIProvider } from "./provider/openai"
+import type { Provider } from "./provider"
 import { readTool } from "./tool/read"
 import { writeTool } from "./tool/write"
 import { editTool } from "./tool/edit"
@@ -16,8 +19,10 @@ import type { Tool } from "./tool/tool"
 import { createSession, listSessions } from "./session"
 import { saveMessage, loadMessages } from "./message"
 
-// 1. 读配置
+// 1. 读配置 + 创建 Provider
+// 对照 opencode: 它根据 provider 配置创建对应的 Route，我们简化为只支持 OpenAI 兼容
 const config = await loadConfig()
+const provider: Provider = createOpenAIProvider(config)
 
 // 2. 注册工具：把所有可用工具放一个数组里
 // 对照 opencode: 它用 ToolRegistry 管理，我们简化为数组
@@ -115,9 +120,9 @@ while (true) {
   while (step < MAX_STEPS) {
     step++
 
-    // 调 LLM（带 tools，流式输出文本）
+    // 调 LLM（带 tools，流式输出文本）——通过 Provider 接口调用
     process.stdout.write("AI: ")
-    const result = await chatWithTools(messages, config, tools, (text) => {
+    const result = await provider.chatWithTools(messages, tools, (text) => {
       process.stdout.write(text)
     })
     console.log()
