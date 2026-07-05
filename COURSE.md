@@ -184,10 +184,40 @@ opencode-from-scratch/
   - 预告阶段 4：更多工具（write、edit、bash 等）
 
 ### 阶段 4：工具集
-- 逐步实现：write、edit、bash、grep、glob、task、todowrite、webfetch
-- 每个工具配 .txt 描述文件（LLM 看的工具说明）
-- 工具输出截断策略
-- 产出：一个能读写文件、执行命令、搜索代码的 agent
+
+> **目标**：实现 write、edit、bash、grep、glob 五个核心工具，让 agent 能读写文件、执行命令、搜索代码。每个工具遵循 3.2 课的 Tool 接口模式。
+>
+> **产出**：一个能读写文件、执行命令、搜索代码的 agent。
+
+#### 课程
+
+- **4.1 write + edit：文件写入与编辑**
+  - write 工具：写文件（Bun.write）
+  - edit 工具：精确字符串替换（oldString → newString）
+  - edit 的 replaceAll 参数：替换所有匹配
+  - 对照 opencode：看 `tool/write.txt`、`tool/edit.txt` 的描述
+  - 为什么 edit 要要求先 read（防止盲目编辑）
+
+- **4.2 bash：执行 shell 命令**
+  - bash 工具：用 Bun.spawn 执行命令
+  - 捕获 stdout/stderr/exit code
+  - 命令超时处理
+  - 对照 opencode：看 `tool/shell.ts` 和 `tool/shell/shell.txt`
+  - 安全考虑：为什么不直接给 LLM shell 访问（阶段 10 的权限系统预告）
+
+- **4.3 grep + glob：搜索工具**
+  - glob 工具：按文件名模式匹配（`**/*.ts`）
+  - grep 工具：按文件内容搜索（正则表达式）
+  - Bun.Glob 和正则匹配
+  - 对照 opencode：看 `tool/glob.txt`、`tool/grep.txt`
+  - 工具协作：glob 找文件 → read 读内容 → edit 修改
+
+- **4.4 工具输出截断 + 阶段验收**
+  - 为什么需要截断：工具输出太长会撑爆 LLM 上下文
+  - 实现简单的截断策略（最大行数/字节数）
+  - 对照 opencode：看 `tool/truncate.ts` 的截断逻辑
+  - 验收：agent 能读写文件、执行命令、搜索代码
+  - 工程思维：声明式工具定义的扩展性——加工具不改 tool loop
 
 ### 阶段 5：Session 持久化
 - 引入 SQLite + Drizzle ORM
