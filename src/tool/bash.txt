@@ -1,0 +1,10 @@
+执行 shell 命令。
+
+参数：
+- command：要执行的 shell 命令（如 "ls -la"、"git status"、"bun test"）
+
+注意：
+- 命令在项目根目录执行
+- 输出包括 stdout、stderr 和退出码
+- 命令超时 30 秒后自动终止
+- 用于 git、ls、npm 等终端操作，不要用于文件读写（用 read/write/edit）

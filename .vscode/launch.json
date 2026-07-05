@@ -8,7 +8,7 @@
       "program": "src/index.ts",
       "cwd": "${workspaceFolder}",
       "env": {
-        "DEBUG_INPUTS": "[\"src/index.ts 里写了什么？\"]"
+        "DEBUG_INPUTS": "[\"运行 git status 看看\"]"
       }
     },
     {
