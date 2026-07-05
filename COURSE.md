@@ -220,10 +220,47 @@ opencode-from-scratch/
   - 工程思维：声明式工具定义的扩展性——加工具不改 tool loop
 
 ### 阶段 5：Session 持久化
-- 引入 SQLite + Drizzle ORM
-- 设计 session / message / part 表结构
-- 对话历史持久化与读取
-- 产出：重启程序后能恢复之前的对话
+
+> **目标**：用 SQLite + Drizzle ORM 把对话历史存到数据库，重启程序后能恢复之前的对话。
+>
+> **产出**：`bun run src/index.ts` 启动时能选择恢复之前的 session，对话历史从数据库加载。
+
+#### 课程
+
+- **5.1 SQLite + Drizzle：数据库搭建与表设计**
+  - 为什么需要持久化：目前 messages 在内存里，重启就没了
+  - SQLite：轻量级文件数据库（类比 Python 的 sqlite3）
+  - Drizzle ORM：TS 的 ORM（类比 SQLAlchemy）
+  - 安装 drizzle-orm + bun:sqlite
+  - 设计表结构：session 表（id、title、time_created）、message 表（id、session_id、role、content、tool_calls、time_created）
+  - 对照 opencode：看 `core/src/session/sql.ts` 的表定义（比我们复杂得多）
+  - 数据库文件位置（对照 opencode：`~/.local/share/opencode/opencode.db`）
+
+- **5.2 Session CRUD：创建、列表、加载**
+  - 创建 session：INSERT 一行到 session 表
+  - 列出 sessions：SELECT 所有 session
+  - 加载 session：SELECT session by id
+  - 生成 session ID（ulid 或时间戳）
+  - 对照 opencode：看 `session.ts` 的 create 函数
+
+- **5.3 Message 存储：保存和加载对话历史**
+  - 保存消息：每次 user/assistant/tool 消息 INSERT 到 message 表
+  - 加载历史：SELECT message by session_id，按 time_created 排序
+  - JSON 序列化：tool_calls 存为 JSON 字符串
+  - 对照 opencode：它的消息拆成 message + part 两表，我们用单表简化
+
+- **5.4 集成到 agent：重启恢复对话**
+  - 启动时选择：新建 session 还是恢复已有
+  - 恢复时从数据库加载 messages，继续对话
+  - 每轮对话自动存入数据库
+  - 对照 opencode：它的 session 管理有多层（project、workspace、parent）
+  - 产出：重启后能恢复之前的对话
+
+- **5.5 阶段验收：持久化 agent + 工程思维总结**
+  - 跑通：新建 session → 对话 → 重启 → 恢复 → 继续对话
+  - 对照 opencode：我们的直接 CRUD vs opencode 的事件溯源 + 投影
+  - 工程思维：为什么 opencode 用事件溯源？什么时候该用它？
+  - 预告阶段 6：Provider 抽象
 
 ### 阶段 6：Provider 抽象
 - 从硬编码 OpenAI 抽象出 Provider 接口
