@@ -8,6 +8,8 @@ import { readTool } from "./tool/read"
 import { writeTool } from "./tool/write"
 import { editTool } from "./tool/edit"
 import { bashTool } from "./tool/bash"
+import { globTool } from "./tool/glob"
+import { grepTool } from "./tool/grep"
 import type { Tool } from "./tool/tool"
 
 // 1. 读配置
@@ -15,11 +17,11 @@ const config = await loadConfig()
 
 // 2. 注册工具：把所有可用工具放一个数组里
 // 对照 opencode: 它用 ToolRegistry 管理，我们简化为数组
-const tools: Tool[] = [readTool, writeTool, editTool, bashTool]
+const tools: Tool[] = [readTool, writeTool, editTool, bashTool, globTool, grepTool]
 
 // 3. messages 历史
 const messages: Message[] = [
-  { role: "system", content: "你是一个简洁的助手，用中文回答。你可以使用 read、write、edit、bash 工具读取、写入、编辑文件和执行命令。" },
+  { role: "system", content: "你是一个简洁的助手，用中文回答。你可以使用 read、write、edit、bash、glob、grep 工具读取、写入、编辑文件、执行命令和搜索代码。" },
 ]
 
 // ── 调试模式 ──────────────────────────────────────────────
