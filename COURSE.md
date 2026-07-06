@@ -325,7 +325,7 @@ opencode-from-scratch/
 - [x] 阶段 3：工具循环（Agent 的核心）
 - [x] 阶段 4：工具集
 - [x] 阶段 5：Session 持久化
-- [ ] 阶段 6：Provider 抽象
+- [x] 阶段 6：Provider 抽象
 - [ ] 阶段 7：System Context & AGENTS.md
 - [ ] 阶段 8：CLI 入口
 - [ ] 阶段 9：TUI 终端界面（选做）
