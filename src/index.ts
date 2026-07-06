@@ -18,6 +18,7 @@ import { truncate } from "./tool/truncate"
 import type { Tool } from "./tool/tool"
 import { createSession, listSessions } from "./session"
 import { saveMessage, loadMessages } from "./message"
+import { buildSystemPrompt } from "./system-context"
 
 // 1. 读配置 + 创建 Provider
 // 对照 opencode: 它根据 provider 配置创建对应的 Route，我们简化为只支持 OpenAI 兼容
@@ -29,10 +30,11 @@ const provider: Provider = createOpenAIProvider(config)
 const tools: Tool[] = [readTool, writeTool, editTool, bashTool, globTool, grepTool]
 
 // 3. system prompt（不存数据库，每次启动重新生成）
-// 对照 opencode: system prompt 由 system-context 模块组装（阶段 7 会实现）
+// 对照 opencode: system prompt 由 system-context 模块组装
+// 7.1 课：环境信息 + 角色定义；7.2 课加 AGENTS.md
 const systemPrompt: Message = {
   role: "system",
-  content: "你是一个简洁的助手，用中文回答。你可以使用 read、write、edit、bash、glob、grep 工具读取、写入、编辑文件、执行命令和搜索代码。",
+  content: buildSystemPrompt(),
 }
 
 // ── 调试模式 ──────────────────────────────────────────────

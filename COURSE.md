@@ -294,9 +294,34 @@ opencode-from-scratch/
   - 工程思维：正交分解——把 N×M×K 降成 N+M+K
 
 ### 阶段 7：System Context & AGENTS.md
-- 实现 AGENTS.md 文件加载（项目级 + 全局级）
-- 组装 system prompt（日期、环境、工具列表、指令）
-- 产出：agent 能读取项目指令并遵守
+
+> **目标**：把硬编码的 system prompt 改成动态组装——环境信息 + AGENTS.md 项目指令，让 agent 能读取项目指令并遵守。
+>
+> **产出**：`bun run src/index.ts` 启动时自动加载 AGENTS.md，system prompt 包含环境信息和项目指令。
+
+#### 课程
+
+- **7.1 环境信息：给 LLM 上下文**
+  - 当前问题：system prompt 是硬编码字符串，LLM 不知道当前日期、工作目录等
+  - LLM 需要什么环境信息：日期、平台、工作目录、是否 git 仓库
+  - 对照 opencode：看 `session/system.ts` 的 environment 函数
+  - 实现 `src/system-context.ts`：组装环境信息
+  - 替换 index.ts 里的硬编码 system prompt
+
+- **7.2 AGENTS.md 加载：项目指令**
+  - AGENTS.md 是什么：给 AI 的项目指令（自由格式 markdown）
+  - 加载项目根目录的 AGENTS.md
+  - findUp 搜索：从当前目录向上找，收集所有 AGENTS.md
+  - 全局 AGENTS.md（~/.config/opencode/AGENTS.md）
+  - 拼接：环境信息 + AGENTS.md → 完整 system prompt
+  - 对照 opencode：看 `session/instruction.ts` 的搜索逻辑
+
+- **7.3 对照 opencode + 阶段验收**
+  - opencode 的 7 组件 system prompt（base + env + instructions + mcp + skills + structured + user）
+  - 我们的 2 组件简化版
+  - 每次调用重新组装 vs 一次性（opencode 每轮都重新读 AGENTS.md）
+  - 验收：修改 AGENTS.md → 下一轮对话生效
+  - 工程思维：system prompt 是 agent 的"操作手册"
 
 ### 阶段 8：CLI 入口
 - 用 yargs 构建 CLI（run、serve 等子命令）
