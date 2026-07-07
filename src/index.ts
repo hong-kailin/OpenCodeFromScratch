@@ -102,6 +102,22 @@ async function runToolLoop(
 
 yargs(hideBin(process.argv))
   .scriptName("opencode-from-scratch")
+  // 全局选项：所有命令都能用 --debug
+  // 对照 opencode: src/index.ts 的 .option("print-logs", ...) 等
+  .option("debug", {
+    alias: "d",
+    type: "boolean",
+    description: "启用调试日志",
+    global: true,
+  })
+  // 中间件：在 handler 之前运行，做跨命令的通用处理
+  // 对照 opencode: src/index.ts 的 .middleware（选项转环境变量）
+  .middleware(async (args) => {
+    if (args.debug) {
+      process.env.DEBUG = "1"
+    }
+    process.env.AGENT = "1"
+  })
   .command(
     "run [message..]",
     "运行 agent",

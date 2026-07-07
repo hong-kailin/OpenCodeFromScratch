@@ -339,11 +339,18 @@ opencode-from-scratch/
   - 非交互模式：`bun run src/index.ts run "你好"` 直接发一条消息
   - 对照 opencode：看 `src/index.ts` 的 yargs 配置和 `cli/cmd/run.ts`
 
-- **8.2 对照 opencode + 阶段验收**
-  - opencode 的 CLI 架构：23 个子命令、effectCmd 包装器、middleware
-  - 我们的 1 命令简化版
+- **8.2 yargs 中间件：全局前置处理**
+  - 什么是中间件：在命令 handler 之前运行的函数
+  - 为什么需要：跨命令的通用逻辑（设置环境变量、日志级别等）
+  - 执行顺序：builder → middleware → handler
+  - 实现 --debug 全局选项 + middleware 设置环境变量
+  - 对照 opencode：看 `src/index.ts` 的 middleware（选项转环境变量）
+
+- **8.3 对照 opencode + 阶段验收**
+  - opencode 的 CLI 架构：23 个子命令、effectCmd 包装器（Effect-TS 后续阶段讲）
+  - 我们的 1 命令 + middleware 简化版
   - `run` 命令的 3 种模式（非交互、交互本地、交互 attach）
-  - 验收：`run "你好"` 单次、`run -c` 恢复、`run -s <id>` 指定恢复
+  - 验收：`run "你好"` 单次、`run -c` 恢复、`run -s <id>` 指定恢复、`--debug` 调试模式
   - 工程思维：CLI 是 agent 的"外壳"——用户交互的入口
 
 ### 阶段 9：TUI 终端界面（选做）
@@ -370,7 +377,7 @@ opencode-from-scratch/
 - [x] 阶段 5：Session 持久化
 - [x] 阶段 6：Provider 抽象
 - [x] 阶段 7：System Context & AGENTS.md
-- [ ] 阶段 8：CLI 入口
+- [x] 阶段 8：CLI 入口
 - [ ] 阶段 9：TUI 终端界面（选做）
 - [ ] 阶段 10：高级特性（选做）
 
