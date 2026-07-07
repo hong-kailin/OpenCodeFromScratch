@@ -324,9 +324,27 @@ opencode-from-scratch/
   - 工程思维：system prompt 是 agent 的"操作手册"
 
 ### 阶段 8：CLI 入口
-- 用 yargs 构建 CLI（run、serve 等子命令）
-- 对话交互循环（readline）
-- 产出：bun run src/index.ts 启动 agent
+
+> **目标**：用 yargs 构建 CLI，把 `src/index.ts` 的裸 `while(true) + prompt()` 改成正式的命令行工具，支持 `--continue`/`--session` 等选项。
+>
+> **产出**：`bun run src/index.ts run "你好"` 单次运行，`bun run src/index.ts run -c` 恢复上次会话。
+
+#### 课程
+
+- **8.1 yargs 构建 CLI：命令与选项**
+  - yargs 是什么（类比 Python 的 argparse/click）
+  - 安装 yargs，定义 `run` 命令
+  - 把 index.ts 的逻辑搬进 `run` 命令的 handler
+  - 选项：`--continue`/`-c`（恢复上次）、`--session`/`-s`（指定 session ID）、`-m`/`--model`（指定 model）
+  - 非交互模式：`bun run src/index.ts run "你好"` 直接发一条消息
+  - 对照 opencode：看 `src/index.ts` 的 yargs 配置和 `cli/cmd/run.ts`
+
+- **8.2 对照 opencode + 阶段验收**
+  - opencode 的 CLI 架构：23 个子命令、effectCmd 包装器、middleware
+  - 我们的 1 命令简化版
+  - `run` 命令的 3 种模式（非交互、交互本地、交互 attach）
+  - 验收：`run "你好"` 单次、`run -c` 恢复、`run -s <id>` 指定恢复
+  - 工程思维：CLI 是 agent 的"外壳"——用户交互的入口
 
 ### 阶段 9：TUI 终端界面（选做）
 - 引入 opentui/solid 构建终端 UI
