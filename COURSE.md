@@ -353,10 +353,56 @@ opencode-from-scratch/
   - 验收：`run "你好"` 单次、`run -c` 恢复、`run -s <id>` 指定恢复、`--debug` 调试模式
   - 工程思维：CLI 是 agent 的"外壳"——用户交互的入口
 
-### 阶段 9：TUI 终端界面（选做）
-- 引入 opentui/solid 构建终端 UI
-- 消息流渲染、工具调用展示、输入框
-- 产出：类 opencode 的终端交互界面
+### 阶段 9：TUI 终端界面
+
+> **目标**：用 opentui/solid 构建终端 UI，替换 `prompt()` + `console.log` 的交互方式，实现消息流渲染、输入框、工具调用展示。
+>
+> **产出**：`bun run src/index.ts tui` 启动终端 UI，在终端里对话、看流式输出、看工具调用。
+
+#### 前置知识
+
+- JSX：HTML-like 语法写在 TypeScript 里（不是字符串模板）
+- SolidJS 响应式：createSignal（响应式变量）、createMemo（计算属性）、createEffect（副作用）
+- 控制流组件：`<Show>`（条件渲染）、`<For>`（列表渲染）
+- opentui 终端元素：`<box>`、`<text>`、`<scrollbox>`、`<textarea>`
+
+#### 课程
+
+- **9.1 JSX + SolidJS：响应式编程入门**
+  - JSX 是什么：在 TypeScript 里写 HTML 风格的标签（不是字符串）
+  - SolidJS 响应式：createSignal（变量变了自动更新 UI）、createMemo（计算值）、createEffect（副作用）
+  - 控制流组件：`<Show>`（条件渲染）、`<For>`（列表渲染）
+  - Python 类比：signal = 可观察变量，改了自动通知；memo = 计算属性；effect = 响应式回调
+  - 对照 opencode：看 `packages/tui/src/context/sync.tsx` 的 createStore
+
+- **9.2 opentui 终端渲染：第一个 TUI**
+  - opentui 元素：`<box>`（容器）、`<text>`（文本）、`<scrollbox>`（滚动区）
+  - render() 函数：把组件挂载到终端
+  - `--conditions=browser` 的原因（SolidJS 客户端 vs server 版本）
+  - jsxImportSource 配置
+  - 写第一个 TUI：显示标题 + 计数器
+  - 对照 opencode：看 `packages/tui/src/app.tsx` 的 render 调用
+
+- **9.3 消息流渲染：列表 + 流式文本**
+  - 消息列表组件：`<For>` 遍历 messages 数组
+  - 不同角色不同样式：user（左边框）、assistant（绿色文本）、tool（灰色）
+  - 流式文本：signal 更新 → SolidJS 自动重渲染
+  - `<scrollbox>` 自动滚动到底部
+  - 对照 opencode：看 `routes/session/index.tsx` 的消息渲染
+
+- **9.4 输入框 + 集成到 agent**
+  - `<textarea>` 组件：onContentChange、onSubmit
+  - 连接到 agent loop：提交消息 → 调 provider → 流式渲染回复
+  - 替换 prompt() + console.log
+  - 添加 `tui` 命令到 CLI
+  - 对照 opencode：看 `component/prompt/index.tsx`
+
+- **9.5 工具调用展示 + 阶段验收**
+  - 工具调用状态展示：spinner（执行中）→ 结果（完成）
+  - `[调用工具] read(...)` 的可视化
+  - 验收：TUI 里对话、流式输出、工具调用展示
+  - 对照 opencode：看 `routes/session/index.tsx` 的 ToolPart 组件
+  - 工程思维：TUI 是"渲染层"——只管显示，不管业务逻辑
 
 ### 阶段 10：高级特性（选做）
 - Permission 系统（工具执行前确认）

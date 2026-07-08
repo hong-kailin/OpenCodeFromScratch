@@ -7,8 +7,10 @@
     "types": ["bun"],
     "paths": {
       "@/*": ["./src/*"]
-    }
+    },
+    "jsx": "preserve",
+    "jsxImportSource": "@opentui/solid"
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": ["node_modules", "opencode"]
 }
