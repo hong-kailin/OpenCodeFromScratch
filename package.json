@@ -5,6 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "bun run src/index.ts",
+    "tui": "bun run src/tui/hello.tsx",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
