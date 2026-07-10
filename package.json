@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "bun run src/index.ts",
     "tui": "bun run src/tui/hello.tsx",
+    "tui:debug": "bun --inspect=ws://localhost:6499/debug src/tui/agent.tsx",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

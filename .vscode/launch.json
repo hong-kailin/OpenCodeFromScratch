@@ -17,6 +17,13 @@
       "name": "调试当前文件",
       "program": "${file}",
       "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "bun",
+      "request": "attach",
+      "name": "Attach 到外部终端",
+      "url": "ws://localhost:6499/debug",
+      "cwd": "${workspaceFolder}"
     }
   ]
 }
