@@ -198,4 +198,4 @@ opencode 是一个大型 TypeScript monorepo（31 个 package），技术栈为 
 
 见 [COURSE.md](./COURSE.md) 的"当前状态"部分。
 
-> **下一步**：从阶段 0 开始。进入前先细化 COURSE.md 中阶段 0 的具体课程内容。
+> **下一步**：阶段 0-9 已完成（简化版 agent loop 跑通）。下一步开始阶段 10「Effect-TS 入门」--这是"演进到 1:1 复刻"路线的起点，后续阶段 10-21 都建立在其上。进入前先细化 COURSE.md 中阶段 10 的具体课程内容。

@@ -404,14 +404,215 @@ opencode-from-scratch/
   - 对照 opencode：看 `routes/session/index.tsx` 的 ToolPart 组件
   - 工程思维：TUI 是"渲染层"——只管显示，不管业务逻辑
 
-### 阶段 10：高级特性（选做）
-- Permission 系统（工具执行前确认）
-- MCP（Model Context Protocol）支持
-- Subagent（@general 子 agent 调用）
-- Compaction（长对话压缩）
-- Plugin 系统
+
+### 阶段 10：Effect-TS 入门（从痛点出发）
+
+> **目标**：引入 Effect-TS 的核心三件套--Service/Layer（依赖注入）、Stream（流式）、Schema（运行时校验），用它们重构现有 agent loop。功能完全不变，但架构从"裸 async/await + 参数到处传"升级到"Effect 服务化"。
+>
+> **为什么现在做**：前 9 阶段我们用裸 async/await，能跑。但随着功能增多，config、provider、db、session 这些依赖要在每个函数间手动传递，越来越乱。这正是 opencode 用 Effect-TS 的根本原因--Service/Layer 提供依赖注入，让"谁需要什么服务"由 Context 自动提供，不用层层传参。先感受到痛点，再用 Effect 解决，理解才深刻。
+>
+> **核心主题**：
+> - Effect.gen 与 Effect 流水线（对照 Python 的 async + Result 类型）
+> - Service + Layer：定义服务、提供实现、从 Context 取用（对照依赖注入容器）
+> - Effect Stream：替代 ReadableStream，流式处理的函数式抽象
+> - Effect Schema：声明式数据契约 + 运行时校验（对照 dataclass + pydantic）
+> - 错误处理：Effect 的 typed error channel（对照 Python 的 try/except 但类型化）
+>
+> **产出**：agent loop 用 Effect 重构，config/provider/db 变成 Service，从 Context 取用而非传参。
+
+### 阶段 11：Monorepo 拆分 + Schema 契约层
+
+> **目标**：把单 package 拆成 Bun workspaces monorepo，先抽出 `schema` 包作为最底层的共享契约层。
+>
+> **为什么现在做**：单 package 里类型定义和业务逻辑混在一起，加新功能时类型重复定义、边界模糊。opencode 的 37 个 package 以 `schema` 为叶子节点--所有领域契约（Session/Message/Part/ToolPart/ToolState/Provider/Model/Permission）都定义在 schema 包，被 core/protocol/server/client 共享。先拆 schema 包，建立"契约层"概念。
+>
+> **核心主题**：
+> - Bun workspaces：monorepo 配置与包间引用
+> - package 分层边界：schema 是叶子（只依赖 effect），上层依赖下层
+> - 把现有 interface/类型搬到 schema 包，用 Effect Schema 重写
+> - 对照 opencode：`packages/schema/src/` 的 28 个领域 schema
+>
+> **产出**：`packages/{schema, opencode}` 两层结构，所有共享类型在 schema 包。
+
+### 阶段 12：Core 领域服务化
+
+> **目标**：把 session/provider/tool/database/filesystem 等领域逻辑重构成 Effect Service，搬进新建的 `core` 包。
+>
+> **为什么现在做**：现在这些领域逻辑散在 src/ 各文件，没有统一服务边界。opencode 的 core 包是最大的领域包，每个领域是一个 Effect Service（Database、Filesystem、Provider、Tool 注册表、SystemContext）。服务化后，agent 通过 Context 访问任意服务，可替换实现（测试时 mock）。
+>
+> **核心主题**：
+> - Database 服务：Effect 化的 Drizzle + SQLite（对照 opencode 的 `effect-drizzle-sqlite`）
+> - Filesystem 服务：封装文件读写、glob、grep
+> - Tool 注册表服务：工具的注册与查找
+> - SystemContext 服务：组装 system prompt
+> - Provider 服务：封装 LLM 调用（阶段 14 升级成 Route）
+> - 对照 opencode：`packages/core/src/` 的领域文件 + 同名子目录结构
+>
+> **产出**：`packages/{schema, core, opencode}` 三层结构，agent 通过 Context 取用 core 服务。
+
+### 阶段 13：Session 事件溯源
+
+> **目标**：把 session 持久化从"直接 CRUD"重构成"事件溯源 + 投影"--所有状态变化先写成 durable event，再由 projector 投影成可查询视图。
+>
+> **为什么现在做**：当前的直接 CRUD 有硬伤：无法 revert（回滚到某步）、无法精确恢复中途状态、无法压缩历史。opencode 的 session 是事件溯源：以 sessionID 为聚合根、事件带递增 seq、投影器把事件应用到 DB 表。这是 opencode 最精巧的设计之一，也是 Effect Stream + Service 的最佳实践场。
+>
+> **核心主题**：
+> - 事件元模型：Event.define（type + durable + data schema）
+> - EventV2 服务：publish（持久化+通知）、subscribe、project、replay
+> - 投影器：为每种事件注册投影函数，事件 -> DB 表
+> - 事件表 + 序列表 + 投影表（vs 我们的单表）
+> - 从投影重建对话历史
+> - admit/promote 两阶段 prompt 投递
+> - 对照 opencode：`schema/src/session-event.ts`（30 种事件）、`core/src/session/projector.ts`
+>
+> **产出**：session 状态由事件流驱动，支持从事件重建、revert 回滚。
+
+### 阶段 14：LLM Route 四轴模型
+
+> **目标**：把简单 Provider 接口升级成 Route 四轴模型（Protocol + Endpoint + Auth + Framing），抽出独立的 `llm` 包。
+>
+> **为什么现在做**：当前加一个新 provider 要复制粘贴整份代码，协议差异（OpenAI vs Anthropic）混在 Provider 实现里。opencode 的 Route 把"调一个 LLM API"分解成四个正交维度：Protocol（说哪种协议）、Endpoint（发去哪）、Auth（怎么认证）、Framing（怎么切流）。四轴组合后，DeepSeek/TogetherAI 等 OpenAI 兼容厂商只需几行复用同一 Protocol。
+>
+> **核心主题**：
+> - Protocol：body schema + stream 状态机（把 provider event 翻译成通用 LLMEvent）
+> - Endpoint：声明式 URL 构造
+> - Auth：可组合的认证（bearer/header/config，支持 andThen/orElse）
+> - Framing：字节流 -> 帧（SSE / 二进制 event-stream）
+> - Route.make：四轴组合
+> - Provider Turn 完整流程：compile -> stream -> 状态机翻译
+> - 对照 opencode：`packages/llm/src/route/`、`packages/llm/AGENTS.md`
+>
+> **产出**：`packages/{schema, core, llm, opencode}` 四层，多厂商 protocol 复用。
+
+### 阶段 15：Server + Protocol + Client
+
+> **目标**：引入 HTTP server（Effect HttpApi + Hono）+ SSE 事件流 + 生成 client SDK，把 TUI 和 agent 拆成两个进程。
+>
+> **为什么现在做**：当前 TUI 和 agent 耦合在单进程，无法支持 web/desktop 等多客户端。opencode 把 agent 跑在 server 进程，TUI/web/desktop 通过 HTTP + SSE 连接。引入 `protocol` 包（用 Effect HttpApi 声明式定义 API）+ `server` 包（接上 handler 实现）+ `client` 包（生成的 SDK）。这是从"单进程应用"到"客户端-服务端架构"的关键跃迁。
+>
+> **核心主题**：
+> - Effect HttpApi：声明式定义 API（endpoint + schema）
+> - protocol 包：18 个 API group 的定义（不含实现）
+> - server 包：HttpApiBuilder.layer，handler 接 core 服务
+> - SSE：session 事件流实时推给客户端
+> - client 包：从 protocol 生成的客户端 SDK
+> - TUI 改造成连 server 的客户端（两进程架构）
+> - 对照 opencode：`packages/protocol/`、`packages/server/`、`packages/client/`
+>
+> **产出**：两进程架构，`bun run server` 跑 agent，TUI 通过 HTTP 连接。
+
+### 阶段 16：Permission 系统
+
+> **目标**：给工具执行加上权限检查--危险操作（写文件、跑命令）执行前询问用户确认。
+>
+> **为什么现在做**：当前工具能直接改文件、跑任意命令，没有任何确认环节。opencode 的 permission 系统在工具执行前检查规则（allow/ask/deny），可配置。配合阶段 17 的 agent 定义，不同 agent 有不同权限边界（build 全权限、plan 只读）。
+>
+> **核心主题**：
+> - 权限规则定义与匹配（allow/ask/deny）
+> - 工具执行前的权限拦截流程
+> - 权限持久化（记住用户选择）
+> - 对照 opencode：`packages/opencode/src/permission/`、`core/src/permission/`
+>
+> **产出**：工具执行前有权限流程，危险操作需确认。
+
+### 阶段 17：Agent 定义 + Subagent
+
+> **目标**：从单一 agent 扩展到多 agent 体系--build（全权限）、plan（只读）、general（子 agent），实现 task 工具委派子 session。
+>
+> **为什么现在做**：现在只有一个 agent 干所有事。opencode 的 agent 是可配置的：每个 agent 定义自己的 tools、permissions、system prompt。task 工具能 spawn 子 session（subagent），父 agent 委派任务给子 agent，子 session 有独立的 sessionID 和 parent_id。这是"分而治之"在 agent 上的体现。
+>
+> **核心主题**：
+> - Agent 配置：tools + permissions + prompt + model
+> - build / plan / general 三种 agent 的差异
+> - task 工具：spawn 子 session，等待结果返回
+> - parent_id 层级（子 session 的父子关系）
+> - 对照 opencode：`packages/opencode/src/agent/`、`tool/task/`
+>
+> **产出**：多 agent 切换，task 工具委派子 agent。
+
+### 阶段 18：更多工具
+
+> **目标**：补全 opencode 的完整工具集--todowrite、webfetch、websearch、question、skill、apply_patch。
+>
+> **为什么现在做**：当前只有 6 个基础工具（read/write/edit/bash/grep/glob）。opencode 还有：todowrite（任务清单管理）、webfetch（抓网页）、websearch（联网搜索）、question（向用户提问）、skill（加载技能）、apply_patch（批量补丁）。每个工具有描述文件（.txt）+ 实现，遵循统一的 Tool 接口。
+>
+> **核心主题**：
+> - todowrite：结构化任务清单（LLM 自我规划）
+> - webfetch + websearch：联网能力（HTML 解析、搜索 API）
+> - question：agent 主动向用户提问
+> - skill + apply_patch
+> - 工具描述文件的作用（给 LLM 看的说明）
+> - 对照 opencode：`packages/opencode/src/tool/`
+>
+> **产出**：完整工具集，agent 能力全面。
+
+### 阶段 19：MCP 支持
+
+> **目标**：集成 Model Context Protocol，让 agent 能接入外部 MCP server 扩展工具。
+>
+> **为什么现在做**：工具都内置在代码里，扩展要改源码。MCP 是标准协议，让外部 server 提供工具/资源/prompt，agent 动态发现并调用。opencode 支持 MCP server 配置，自动注册成工具。这是 agent 生态扩展的关键。
+>
+> **核心主题**：
+> - MCP 协议：tools/resources/prompts 三类能力
+> - MCP client：连接外部 server，发现能力
+> - MCP server 配置（opencode.json 里配）
+> - 自动注册成 Tool
+> - 对照 opencode：MCP 集成代码
+>
+> **产出**：配置 MCP server 后，工具自动可用。
+
+### 阶段 20：Compaction + 高级特性
+
+> **目标**：实现长对话压缩（compaction）、会话回滚（revert）、插件系统（plugin）、LSP 诊断集成。
+>
+> **为什么现在做**：长对话会撑爆 LLM 上下文窗口。compaction 把旧消息压缩成摘要，腾出空间。revert 让用户回滚到某一步。plugin 系统让外部代码扩展 agent。LSP 集成让 agent 在编辑代码时拿到语言诊断。这些都是 opencode 生产级 agent 的成熟特性。
+>
+> **核心主题**：
+> - Compaction：压缩策略、压缩事件、从压缩点重建历史
+> - Revert：基于事件 seq 的回滚
+> - Plugin 系统：插件 SDK、钩子
+> - LSP 集成：诊断信息喂给 LLM
+> - 对照 opencode：`session/compaction.ts`、`session/revert.ts`、`packages/plugin/`
+>
+> **产出**：长对话可压缩、可回滚、可插件扩展、有 LSP 诊断。
+
+### 阶段 21：Web UI + Desktop
+
+> **目标**：在 TUI 之外，增加 Web UI（SolidJS）和桌面应用（Electron），复用同一套 server + client。
+>
+> **为什么现在做**：阶段 15 的 server/client 架构让多端成为可能。opencode 有 `app`（SolidJS web）、`desktop`（Electron）、`ui`（共享组件库）、`session-ui`（共享会话渲染）。它们都连同一个 server，只是渲染层不同。
+>
+> **核心主题**：
+> - SolidJS Web UI：Vite + 组件
+> - 共享组件库（ui 包）：theme、i18n、icons
+> - session-ui：markdown 流、diff、代码块渲染
+> - Electron 桌面应用：main + preload + renderer
+> - 对照 opencode：`packages/app/`、`packages/desktop/`、`packages/ui/`
+>
+> **产出**：Web 和桌面端可用，与 TUI 共享同一 server。
 
 ---
+
+## 路线图全景
+
+前 9 阶段（已完成）走的是"简化版能跑"路线--用最少抽象把 agent loop 跑通。阶段 10-21 是"演进到 1:1 复刻"路线--每个阶段因为一个具体痛点引入 opencode 的对应抽象：
+
+| 阶段 | 解决的痛点 | 引入的 opencode 抽象 |
+|------|-----------|---------------------|
+| 10 | 依赖到处传 | Effect Service/Layer/Stream/Schema |
+| 11 | 类型重复、边界模糊 | schema 契约层 + Bun workspaces |
+| 12 | 领域逻辑散乱 | core 领域服务化 |
+| 13 | 无法 revert/恢复/压缩 | Session 事件溯源 |
+| 14 | 加 provider 要复制粘贴 | LLM Route 四轴模型 |
+| 15 | TUI 与 agent 耦合 | Server + Protocol + Client |
+| 16 | 工具能乱改无确认 | Permission 系统 |
+| 17 | 单 agent 干所有事 | Agent 定义 + Subagent |
+| 18 | 工具不够用 | 完整工具集 |
+| 19 | 工具扩展要改源码 | MCP 支持 |
+| 20 | 长对话爆上下文 | Compaction + revert + plugin + LSP |
+| 21 | 只有 TUI | Web UI + Desktop |
+
+> **注意**：阶段 10-21 是路线图级规划，进入每个阶段前才细化具体课程内容（与阶段 0-9 一致的活文档原则）。顺序可能根据实际学习情况调整，但"动机驱动 + 渐进演进"的核心不变。
 
 ## 当前状态
 
@@ -424,7 +625,18 @@ opencode-from-scratch/
 - [x] 阶段 6：Provider 抽象
 - [x] 阶段 7：System Context & AGENTS.md
 - [x] 阶段 8：CLI 入口
-- [x] 阶段 9：TUI 终端界面（选做）
-- [ ] 阶段 10：高级特性（选做）
+- [x] 阶段 9：TUI 终端界面
+- [ ] 阶段 10：Effect-TS 入门（从痛点出发）
+- [ ] 阶段 11：Monorepo 拆分 + Schema 契约层
+- [ ] 阶段 12：Core 领域服务化
+- [ ] 阶段 13：Session 事件溯源
+- [ ] 阶段 14：LLM Route 四轴模型
+- [ ] 阶段 15：Server + Protocol + Client
+- [ ] 阶段 16：Permission 系统
+- [ ] 阶段 17：Agent 定义 + Subagent
+- [ ] 阶段 18：更多工具
+- [ ] 阶段 19：MCP 支持
+- [ ] 阶段 20：Compaction + 高级特性
+- [ ] 阶段 21：Web UI + Desktop
 
-> **下一步**：阶段 9 已完成（含 9.5 工具调用 spinner 展示 + 阶段验收）。可选做阶段 10「高级特性」—— Permission 系统、MCP、Subagent、Compaction、Plugin。
+> **下一步**：开始阶段 10「Effect-TS 入门」-- 这是后续所有阶段的基础，opencode 的灵魂。进入前先细化具体课程内容。
