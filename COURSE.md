@@ -407,18 +407,100 @@ opencode-from-scratch/
 
 ### 阶段 10：Effect-TS 入门（从痛点出发）
 
-> **目标**：引入 Effect-TS 的核心三件套--Service/Layer（依赖注入）、Stream（流式）、Schema（运行时校验），用它们重构现有 agent loop。功能完全不变，但架构从"裸 async/await + 参数到处传"升级到"Effect 服务化"。
+> **目标**：引入 Effect-TS（v4 beta，对齐 opencode）的核心三件套--Service/Layer（依赖注入）、Stream（流式）、Schema（运行时校验），用它们重构现有 agent loop。功能完全不变，但架构从"裸 async/await + 参数到处传"升级到"Effect 服务化"。
 >
 > **为什么现在做**：前 9 阶段我们用裸 async/await，能跑。但随着功能增多，config、provider、db、session 这些依赖要在每个函数间手动传递，越来越乱。这正是 opencode 用 Effect-TS 的根本原因--Service/Layer 提供依赖注入，让"谁需要什么服务"由 Context 自动提供，不用层层传参。先感受到痛点，再用 Effect 解决，理解才深刻。
 >
-> **核心主题**：
-> - Effect.gen 与 Effect 流水线（对照 Python 的 async + Result 类型）
-> - Service + Layer：定义服务、提供实现、从 Context 取用（对照依赖注入容器）
-> - Effect Stream：替代 ReadableStream，流式处理的函数式抽象
-> - Effect Schema：声明式数据契约 + 运行时校验（对照 dataclass + pydantic）
-> - 错误处理：Effect 的 typed error channel（对照 Python 的 try/except 但类型化）
->
-> **产出**：agent loop 用 Effect 重构，config/provider/db 变成 Service，从 Context 取用而非传参。
+> **版本说明**：opencode v1.17.13 用的是 `effect@4.0.0-beta.83`。本阶段用 v4 beta 的新 API（`Context.Service<Self, Interface>()("id")`，不是旧版 `Context.Tag`），保证和 opencode 源码 1:1 对齐。
+
+#### 课程
+
+- **10.1 感受痛点：依赖到处传**
+  - 盘点当前代码：`loadConfig()`、`createOpenAIProvider(config)`、tools 数组在 `index.ts` 和 `agent.tsx` **各重复一份**
+  - 实操验证痛点：加第 7 个工具，必须改两处；想共享 db 连接，没有全局位置
+  - `runToolLoop(messages, sessionId, provider, tools)` 的参数越加越多
+  - 引入概念：依赖注入（DI）--让依赖"按需自取"而非"层层传递"
+  - Python 类比：FastAPI 的 `Depends`、Flask 的 `current_app`、一个全局 registry
+  - 本课不写 Effect，只让痛点可见，建立"我们需要 DI 容器"的动机
+
+- **10.2 Effect 基础：一个延迟的计算描述**
+  - 安装 effect（v4 beta）：`bun add effect@beta`
+  - Effect 是什么：不是 Promise，是**计算的描述**（lazy）--先写好"recipe"，run 时才执行
+  - `Effect.gen(function* () { ... })` + `yield*`（对照 Python 的 async generator + await）
+  - `Effect.succeed(x)` / `Effect.fail(err)` / `Effect.promise(() => fetch(...))`
+  - `Effect.runPromise(effect)`：把 Effect 跑起来（对照 `asyncio.run`）
+  - 为什么"描述而非执行"：run 之前可以 map / provide / catch，组合性强
+  - 教 debug：Effect 报错怎么读（fiber trace）、`Effect.runPromise` vs `Effect.runSync`
+  - 对照 opencode：`packages/cli/src/commands/handlers/default.ts`（最简 Effect.gen handler）
+  - 产出：一个跑通的最小 Effect 程序（`bun run src/effect-demo.ts` 打印结果）
+
+- **10.3 Service + Layer：依赖注入**
+  - 三件套：Interface（声明能力）+ Service（`Context.Service<Self, Interface>()("id")` 创建 tag）+ Layer（`Layer.effect(tag, Effect.gen 造实现)`）
+  - 消费：`yield* SomeService` 从 Context 取实例（对照 Python：从 DI 容器取依赖）
+  - 提供：`Effect.provide(SomeLayer)` 把实现塞进 Context
+  - 动手：把 `loadConfig()` 重构成 `ConfigService`--Interface 声明 `get()`，Layer 读 opencode.json
+  - `index.ts` 和 `agent.tsx` 都通过 `yield* ConfigService` 取 config，不再各自 `loadConfig()`
+  - 对照 opencode：`core/src/session/store.ts`（最简洁的 Service 三件套范例）、`core/src/database/database.ts`
+  - 产出：ConfigService，两处调用统一从 Context 取
+
+- **10.4 用 Service 重构 agent loop**
+  - 把 Provider 重构成 `ProviderService`（封装 createOpenAIProvider）
+  - 把 tools 数组重构成 `ToolRegistry` 服务（注册一次，到处可取）
+  - 重构 `runAgentLoop`：签名从 `(messages, provider, tools, callbacks)` 变成 `(messages, callbacks)`，provider/tools 从 Context 取
+  - 同步重构 CLI 版 `runToolLoop`
+  - 验证：加第 7 个工具只改一处（ToolRegistry 的 Layer）
+  - `Effect.fn("Name")(function* () {...})`：opencode 的标志性模式，给函数加 trace 名
+  - Layer 组装：入口处 `mainEffect.pipe(Effect.provide(Layer.mergeAll(ConfigLayer, ProviderLayer, ToolRegistryLayer)))`
+  - 对照 opencode：`core/src/tool/registry.ts`（Tool 注册表）、`llm/src/route/client.ts`（LLMClient 消费方）
+  - 产出：agent loop 从 Context 取依赖，参数不再层层传
+
+- **10.5 Effect Schema：运行时校验**
+  - `Schema.Struct` / `Schema.Class`：声明式数据契约（对照 dataclass + pydantic）
+  - `Schema.decodeUnknown(Schema)(input)`：解析 + 校验，失败返回 typed error
+  - 动手：把 `JSON.parse(tc.function.arguments)` 换成 Schema 校验的工具参数解析
+  - 把 `Message` 类型用 Schema 重写（既当类型又当校验器）
+  - Schema 的双重身份：编译期是 TS 类型，运行期是校验器
+  - 对照 opencode：`packages/schema/src/` 的领域 schema（后续阶段 11 搬进 schema 包）
+  - 产出：工具参数、消息结构有运行时校验，不再裸 JSON.parse
+
+- **10.6 Effect Stream：流式重写**
+  - Stream：惰性拉取式异步序列（对照 Python async iterator，但组合子丰富）
+  - `Stream.fromIterable` / `Stream.map` / `Stream.runForEach` / `Stream.runFold` / `Stream.tap`
+  - 动手：把 `chatWithTools` 的流式输出从 ReadableStream 改成 Effect Stream
+  - onChunk 回调用 `Stream.runForEach` 驱动；完整文本用 `Stream.runFold` 聚合
+  - Stream 的组合性：`stream.pipe(Stream.map(...), Stream.filter(...))` 链式组装
+  - 对照 opencode：`llm/src/protocols/shared.ts`（SSE 分帧的 Stream 组合子大全）、`llm/example/tutorial.ts`
+  - 产出：流式输出用 Effect Stream，可组合、可中断
+
+- **10.7 typed error + 阶段验收**
+  - `Schema.TaggedError` / `Data.TaggedError`：带 tag 的类型化错误（对照 Python 的自定义异常类）
+  - `Effect.catchTag("TagName", ...)` / `Effect.catchAll`：精确捕获
+  - 动手：把 `throw new Error("字符串")` 换成 typed error（ConfigError / LLMError / ToolError）
+  - 验收：typecheck 通过、CLI + TUI 都能跑、功能与阶段 9 一致
+  - 对照 opencode：`llm` 包的 `LLMError`、`Schema.TaggedError` 用法
+  - 工程思维总结：Effect 三件套各自解决什么、为什么要"描述而非执行"、DI 的 trade-off
+  - 产出：完整 Effect 重构，typed error，阶段 10 验收通过
+
+#### 阶段产出
+
+```
+opencode-from-scratch/
+├── package.json              # 新增 effect 依赖
+└── src/
+    ├── effect-demo.ts        # 10.2 最小 Effect 程序
+    ├── service/              # 10.3-10.4 Service 定义
+    │   ├── config.ts         # ConfigService
+    │   ├── provider.ts       # ProviderService
+    │   └── tool-registry.ts  # ToolRegistry
+    ├── agent-loop.ts         # 重构：从 Context 取依赖
+    ├── provider/openai.ts    # 重构：返回 Effect Stream
+    ├── index.ts              # 重构：入口组装 Layer
+    └── tui/agent.tsx         # 重构：从 Context 取依赖
+```
+
+> 全程功能不变，只是"骨架"从 async/await 换成 Effect。这是后续阶段 11-21 的地基--monorepo 拆分、事件溯源、Route、Server 全都建立在 Effect Service/Layer/Stream 之上。
+
+
 
 ### 阶段 11：Monorepo 拆分 + Schema 契约层
 
