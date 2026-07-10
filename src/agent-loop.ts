@@ -13,9 +13,12 @@ export interface LoopCallbacks {
   // LLM 流式输出文本时调用（每收到一个 token 调一次）
   onChunk: (text: string) => void
   // LLM 决定调用工具时调用
-  onToolCall: (name: string, args: string) => void
+  // id 是这次工具调用的唯一标识（来自 LLM 返回的 tool_call.id）
+  // 调用方可以用它把"开始调用"和"得到结果"关联到同一条记录
+  onToolCall: (id: string, name: string, args: string) => void
   // 工具执行完毕时调用
-  onToolResult: (output: string) => void
+  // id 对应 onToolCall 时的 id，调用方据此找到之前那条"执行中"的记录并更新为"已完成"
+  onToolResult: (id: string, output: string) => void
 }
 
 export async function runAgentLoop(
@@ -45,7 +48,8 @@ export async function runAgentLoop(
 
     for (const tc of result.toolCalls) {
       const tool = tools.find((t) => t.id === tc.function.name)
-      callbacks.onToolCall(tc.function.name, tc.function.arguments)
+      // 通知调用方"开始调用工具"，带上 tc.id 以便后续关联结果
+      callbacks.onToolCall(tc.id, tc.function.name, tc.function.arguments)
 
       let output: string
       if (!tool) {
@@ -54,7 +58,8 @@ export async function runAgentLoop(
         const args = JSON.parse(tc.function.arguments)
         output = await tool.execute(args)
       }
-      callbacks.onToolResult(output)
+      // 通知调用方"工具执行完毕"，用同一个 tc.id 找到刚才那条记录并更新
+      callbacks.onToolResult(tc.id, output)
 
       messages.push({
         role: "tool",

@@ -424,7 +424,7 @@ opencode-from-scratch/
 - [x] 阶段 6：Provider 抽象
 - [x] 阶段 7：System Context & AGENTS.md
 - [x] 阶段 8：CLI 入口
-- [ ] 阶段 9：TUI 终端界面（选做）
+- [x] 阶段 9：TUI 终端界面（选做）
 - [ ] 阶段 10：高级特性（选做）
 
-> **下一步**：开始阶段 5「Session 持久化」—— SQLite + Drizzle，对话历史存数据库。
+> **下一步**：阶段 9 已完成（含 9.5 工具调用 spinner 展示 + 阶段验收）。可选做阶段 10「高级特性」—— Permission 系统、MCP、Subagent、Compaction、Plugin。
