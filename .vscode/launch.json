@@ -24,6 +24,13 @@
       "name": "Attach 到外部终端",
       "url": "ws://localhost:6499/debug",
       "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "debugpy",
+      "request": "launch",
+      "name": "调试当前 Python 文件",
+      "program": "${file}",
+      "console": "integratedTerminal"
     }
   ]
 }
