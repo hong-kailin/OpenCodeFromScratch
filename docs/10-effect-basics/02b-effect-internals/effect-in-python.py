@@ -5,9 +5,7 @@
 # 这个文件用 Python 把 Effect-TS 的核心概念"翻译"出来，
 # 让你看清它内部到底在干什么。看完再看 TypeScript 的 Effect 代码就不抽象了。
 #
-# 两个示例都跑通验证过：
-# - 示例 1：Effect 基础（succeed + gen + yield）
-# - 示例 2：Service/Layer 依赖注入
+# 示例：Effect 基础（succeed + gen + yield）
 
 
 # ════════════════════════════════════════════════════════════
@@ -61,43 +59,10 @@ def gen(generator_func):
 
 
 # ════════════════════════════════════════════════════════════
-# Service + Layer：就是一个字典（注册表）
+# 示例：Effect 基础
 # ════════════════════════════════════════════════════════════
 
-# Context 就是一个字典，存"标签 -> 实现"
-context = {}
-
-# Service 是字典的 key（标签）
-CONFIG_SERVICE = "ConfigService"
-
-
-def config_layer():
-    """Layer：造实现，放进字典。读一次文件，缓存。"""
-    # 模拟读 opencode.json（这里用假数据代替）
-    config = {"model": "deepseek-v4-flash", "baseURL": "https://ark.cn-beijing.volces.com"}
-    return {"get": lambda: config}  # 实现：get() 返回缓存的 config
-
-
-def provide(layer, effect):
-    """provide = 造实现存进 context，再跑 effect。"""
-    def recipe():
-        context[CONFIG_SERVICE] = layer()  # 跑 layer，存进 context
-        return effect.run()                 # 跑 effect
-    return Effect(recipe)
-
-
-def get_service():
-    """yield* ConfigService = 从 context 取实现。"""
-    def recipe():
-        return context[CONFIG_SERVICE]  # 从字典取
-    return Effect(recipe)
-
-
-# ════════════════════════════════════════════════════════════
-# 示例 1：Effect 基础
-# ════════════════════════════════════════════════════════════
-
-print("=== 示例 1：Effect 基础 ===")
+print("=== Effect 基础 ===")
 
 
 def my_program():
@@ -115,29 +80,6 @@ print("run 结果:", result)
 
 
 # ════════════════════════════════════════════════════════════
-# 示例 2：Service/Layer 依赖注入
-# ════════════════════════════════════════════════════════════
-
-print("\n=== 示例 2：Service/Layer ===")
-
-
-def use_config():
-    """两个消费者都从 context 自取 config，不用参数传进来。"""
-    config_service = yield get_service()    # 从 context 取（= yield* ConfigService）
-    config = config_service["get"]()         # 调 get()（= yield* config.get()）
-    print("  拿到 model:", config["model"])
-    return "done"
-
-
-# provide 把 config_layer 存进 context，再跑 program
-program2 = provide(config_layer, gen(use_config))
-print("provide 完成，还没执行")
-
-result2 = program2.run()   # 1. 跑 config_layer 造实现存进 context  2. 跑 use_config 从 context 取
-print("run 结果:", result2)
-
-
-# ════════════════════════════════════════════════════════════
 # 对照表
 # ════════════════════════════════════════════════════════════
 
@@ -150,7 +92,5 @@ succeed(x)      Effect(lambda: x)            把值包成函数
 yield*          .run()                       执行函数拿结果
 Effect.gen      Python generator + send      串联多步
 function*       def f(): yield ...           能用 yield 的函数
-Service         字典的 key                    标签
-Layer           造值放字典                     注册实现
-provide         先放值再跑                     装配依赖
 """)
+

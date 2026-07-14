@@ -103,55 +103,6 @@ result = program.run()     # 调用 recipe，这才开始执行
 
 `gen()` 存了 recipe 不执行，`run()` 才执行。这就是"延迟性"。
 
-## Service + Layer：就是一个字典
-
-Service/Layer 的本质更简单--就是一个字典（注册表）。
-
-```python
-# Context 就是一个字典
-context = {}
-
-# Service 是字典的 key（标签）
-CONFIG_SERVICE = "ConfigService"
-
-# Layer 是"造实现，放进字典"
-def config_layer():
-    config = read_file("opencode.json")  # 读一次文件
-    return {"get": lambda: config}       # 实现：get() 返回 config
-
-# provide = 造实现，存进 context，再跑 program
-def provide(layer, effect):
-    def recipe():
-        context[CONFIG_SERVICE] = layer()  # 跑 layer，存进 context
-        return effect.run()                 # 跑 effect
-    return Effect(recipe)
-
-# yield* ConfigService = 从 context 取实现
-def get_service():
-    def recipe():
-        return context[CONFIG_SERVICE]  # 从字典取
-    return Effect(recipe)
-```
-
-用的时候：
-
-```python
-def my_program():
-    config_service = yield get_service()    # 从 context 取（= yield* ConfigService）
-    config = config_service["get"]()         # 调 get()（= yield* config.get()）
-    print(config["model"])
-    return "done"
-
-program = provide(config_layer, gen(my_program))
-# provide 存了 layer 和 program，没执行
-
-result = program.run()
-# 1. 跑 config_layer()，造实现，存进 context
-# 2. 跑 my_program()，从 context 取实现，用
-```
-
-**Service 就是字典的 key，Layer 就是往字典里放值，provide 就是"放完值再跑程序"，yield\* ConfigService 就是从字典取值。** 这就是依赖注入的全部本质。
-
 ## 对照表
 
 | Effect 概念 | Python 等价 | 本质 |
@@ -161,9 +112,6 @@ result = program.run()
 | yield* | `.run()` | 执行函数，拿结果 |
 | Effect.gen | Python generator + send | 串联多步 |
 | function* | `def f(): yield ...` | 能用 yield 的函数 |
-| Service | 字典的 key | 标签 |
-| Layer | 造值放字典 | 注册实现 |
-| provide | 先放值再跑 | 装配依赖 |
 | fail(error) | `Effect(lambda: raise error)` | 把错误包成 Effect |
 
 ## 为什么不直接用 Python 这种方式？
@@ -171,9 +119,9 @@ result = program.run()
 你可能会问：Python 这种方式更简单，为什么要用 Effect 搞这么复杂？
 
 因为 Effect 在简单的外表下加了**类型安全**和**组合性**：
-- TypeScript 的类型系统会检查"你 provide 了所有需要的 Service"--忘了 provide 编译就报错
 - Effect 的 `.pipe(Effect.map(...))` 能在 run 前变换计算
 - Effect 的错误是类型化的，能精确捕获
+- 后续课程会学到 Service/Layer（依赖注入），Effect 的类型系统能保证"所有依赖都提供好了"--忘了 provide 编译就报错
 
 Python 版只是"原理演示"，缺少这些保障。但理解了 Python 版的原理，再看 Effect 的 TypeScript 代码就不觉得抽象了--你知道每个概念对应什么。
 
@@ -183,8 +131,7 @@ Python 版只是"原理演示"，缺少这些保障。但理解了 Python 版的
 2. **succeed = `Effect(lambda: 值)`**：把值包成"返回值的函数"
 3. **yield\* = `.run()`**：执行内层 Effect，拿结果
 4. **Effect.gen = Python generator**：用 yield 串联多步，gen 负责协调
-5. **Service/Layer = 字典**：Service 是 key，Layer 是放值，provide 是"先放值再跑"
 
 ---
 
-下一步：[10.3 Service + Layer：依赖注入](../03-service-layer/01-what-is-service.md) -- 现在你知道了原理，去看 TypeScript 怎么实现就不抽象了。
+下一步：[10.3 Service + Layer：依赖注入](../03-service-layer/01-what-is-service.md) -- 现在你知道了 Effect 的原理，去看 TypeScript 怎么实现就不抽象了。
