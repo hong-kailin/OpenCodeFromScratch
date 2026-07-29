@@ -1,0 +1,127 @@
+/* ─────────────────────────────────────────────────────────────────────
+ * ProgressBar — ALWAYS-ON chapter/step rail docked to the TOP edge.
+ *
+ * Two deliberate choices, both driven by "record it as-is, no post work":
+ *
+ * 1. ALWAYS VISIBLE. It is part of the composition, not dev chrome, so
+ *    it must be readable — see the --chrome-* tokens in base.css. It has
+ *    no hover reveal: a bar that fades out mid-recording is a bar that
+ *    ruins the take.
+ *
+ * 2. IT OVERLAYS THE STAGE. The stage is full-bleed (useStageScale
+ *    margins are 0) so a fullscreen 16:9 recording needs no cropping.
+ *    The bar floats over the stage's top padding rather than pushing the
+ *    stage down — pushing it down would break 16:9 and reintroduce the
+ *    letterbox. Keep --chrome-h <= the theme's --stage-pad-y.
+ * ───────────────────────────────────────────────────────────────────── */
+
+.pb-dock {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--chrome-h);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--chrome-bg);
+  backdrop-filter: var(--chrome-blur);
+  -webkit-backdrop-filter: var(--chrome-blur);
+  border-bottom: 1px solid var(--chrome-border);
+  pointer-events: auto;
+}
+
+.pb {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 100%;
+  /* Adapt to content; if it would exceed the viewport, scroll horizontally
+     instead of squeezing chapter pills / step pips. Right-padded so the
+     GitHub badge never sits on top of the last chapter. */
+  max-width: calc(100vw - 64px);
+  padding: 0 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.pb::-webkit-scrollbar {
+  display: none;
+}
+
+.pb-chapter {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--chrome-text-mute);
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--dur-quick), border-color var(--dur-quick),
+    background var(--dur-quick);
+}
+.pb-chapter:hover {
+  color: var(--chrome-text);
+}
+.pb-active {
+  color: var(--chrome-text);
+  border-color: var(--chrome-accent);
+  background: color-mix(in srgb, var(--chrome-accent) 18%, transparent);
+}
+.pb-num {
+  color: var(--chrome-accent);
+  font-weight: 700;
+}
+/* Inactive chapters keep their number readable but recessed, so the
+   active one reads as the only lit item on the rail. */
+.pb-chapter:not(.pb-active) .pb-num {
+  color: var(--chrome-text-faint);
+}
+
+.pb-pips {
+  flex-shrink: 0;
+  display: flex;
+  gap: 3px;
+  margin-left: 6px;
+}
+.pb-pip {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--chrome-text-faint);
+  cursor: pointer;
+  transition: background var(--dur-quick);
+}
+.pb-pip-on {
+  background: var(--chrome-accent);
+}
+
+.pb-github {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--chrome-text-mute);
+  text-decoration: none;
+  transition: color var(--dur-quick);
+}
+.pb-github:hover {
+  color: var(--chrome-text);
+}
+.pb-github svg {
+  display: block;
+}
