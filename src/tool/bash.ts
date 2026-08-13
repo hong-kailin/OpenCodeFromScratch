@@ -20,11 +20,23 @@ const parameters: JSONSchema = {
 async function execute(args: Record<string, unknown>): Promise<string> {
   const command = args.command as string
 
-  // 用 Bun.spawn 执行命令
-  // 通过 ["sh", "-c", command] 让 shell 解析命令字符串
+  // 跨平台 shell 选择
+  // 对照 opencode: packages/core/src/shell.ts 的 win() 函数
+  //   opencode 在 Windows 上的优先级: pwsh -> powershell -> gitbash -> cmd.exe
+  //   我们简化: Windows 用 powershell.exe，Mac/Linux 用 sh
+  // process.platform 是 Node/Bun 内置变量，"win32" 代表所有 Windows（含 64 位）
+  const isWindows = process.platform === "win32"
+
+  // 用 Bun.spawn 执行命令，让 shell 解析命令字符串
+  // Windows: powershell.exe -NoProfile -Command "命令"
+  //   -NoProfile  不加载用户 PowerShell 配置文件（加快启动、避免配置干扰）
+  //   -Command    执行后面的命令字符串
+  // Mac/Linux: sh -c "命令"
   // 类比 Python: subprocess.run(command, shell=True)
   const proc = Bun.spawn({
-    cmd: ["sh", "-c", command],
+    cmd: isWindows
+      ? ["powershell.exe", "-NoProfile", "-Command", command]
+      : ["sh", "-c", command],
     stdout: "pipe",
     stderr: "pipe",
     cwd: process.cwd(),
