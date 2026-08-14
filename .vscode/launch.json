@@ -7,7 +7,9 @@
       "name": "调试（预设输入）",
       "program": "src/index.ts",
       "cwd": "${workspaceFolder}",
-      "args": ["run"],
+      "args": [
+        "run"
+      ],
       "env": {
         "DEBUG_INPUTS": "[\"运行 git status 看看\"]"
       }
@@ -18,7 +20,11 @@
       "name": "调试（非交互模式）",
       "program": "src/index.ts",
       "cwd": "${workspaceFolder}",
-      "args": ["run", "当前目录有哪些文件？"]
+      "args": [
+        "run",
+        "当前目录有哪些文件？",
+        "--debug"
+      ]
     },
     {
       "type": "bun",
@@ -26,7 +32,10 @@
       "name": "调试（恢复上次会话）",
       "program": "src/index.ts",
       "cwd": "${workspaceFolder}",
-      "args": ["run", "-c"]
+      "args": [
+        "run",
+        "-c"
+      ]
     },
     {
       "type": "bun",
@@ -34,7 +43,11 @@
       "name": "调试（恢复指定会话）",
       "program": "src/index.ts",
       "cwd": "${workspaceFolder}",
-      "args": ["run", "-s", "ses_xxx"]
+      "args": [
+        "run",
+        "-s",
+        "ses_xxx"
+      ]
     },
     {
       "type": "bun",
