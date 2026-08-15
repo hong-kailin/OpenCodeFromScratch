@@ -2,6 +2,16 @@
 
 > 本课目标：学会用 `<Show>` 做条件渲染、`<For>` 做列表渲染，理解为什么不直接用 `if` 和 `.map()`。
 
+## 配套代码
+
+本课有可执行示例：`src/tui-demo/04-control-flow-demo.tsx`
+
+```bash
+bun run src/tui-demo/04-control-flow-demo.tsx
+```
+
+渲染到终端：模拟 agent 消息流，每 0.8 秒来一条新消息。能看到 `<Show>` 的 fallback（「暂无消息」）、`<For>` 逐条追加、memo 计数自动更新。程序 7 秒后自动退出。
+
 ## 为什么需要控制流组件
 
 在普通 TypeScript 里，条件用 `if`/`else`，循环用 `for`/`while`。但在 JSX 里，你不能在标签内部直接写 `if` 语句：
@@ -154,7 +164,7 @@ const [messages, setMessages] = createSignal([
 <For each={messages()}>
   {(msg) => (
     <box flexDirection="column">
-      <text color="cyan">{msg.role}:</text>
+      <text fg="cyan">{msg.role}:</text>
       <text>{msg.content}</text>
     </box>
   )}
@@ -221,7 +231,7 @@ const [messages] = createSignal([
 
 <For each={messages()}>
   {(msg) => (
-    <Show when={msg.content.length > 0} fallback={<text color="gray">（空消息）</text>}>
+    <Show when={msg.content.length > 0} fallback={<text fg="gray">（空消息）</text>}>
       <text>{msg.role}: {msg.content}</text>
     </Show>
   )}
@@ -264,13 +274,13 @@ function ChatApp() {
   return (
     <box flexDirection="column">
       {/* 条件渲染：有消息才显示列表 */}
-      <Show when={hasMessages()} fallback={<text color="gray">暂无消息</text>}>
+      <Show when={hasMessages()} fallback={<text fg="gray">暂无消息</text>}>
         <text>消息列表（共 {messageCount()} 条）：</text>
 
         {/* 列表渲染：遍历消息 */}
         <For each={messages()}>
           {(msg) => (
-            <text color={msg.role === "user" ? "cyan" : "green"}>
+            <text fg={msg.role === "user" ? "cyan" : "green"}>
               {msg.role}: {msg.content}
             </text>
           )}

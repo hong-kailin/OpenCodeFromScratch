@@ -2,6 +2,16 @@
 
 > 本课目标：学会 JSX 语法--在 TypeScript 里写 UI 标签。不是字符串，是真正的语法。
 
+## 配套代码
+
+本课有可执行示例：`src/tui-demo/02-jsx-demo.tsx`
+
+```bash
+bun run src/tui-demo/02-jsx-demo.tsx
+```
+
+渲染到终端，6 条规则全部实战；2 秒后 signal 变化，文字自动变绿（响应式预告）。程序 5 秒后自动退出。
+
 ## JSX 是什么
 
 JSX 是 JavaScript/TypeScript 的语法扩展，让你在代码里直接写 **XML 风格的标签**，用来描述 UI 结构。
@@ -10,16 +20,17 @@ JSX 是 JavaScript/TypeScript 的语法扩展，让你在代码里直接写 **XM
 
 ```tsx
 // 这不是字符串，是 JSX 语法
-const greeting = <text color="green">你好</text>
+// 注意：opentui 的文字颜色属性叫 fg（foreground），不叫 color
+const greeting = <text fg="green">你好</text>
 ```
 
-`<text color="green">你好</text>` 不是字符串（没有引号包裹），是 JSX 标签。TypeScript 编译器会把它转成函数调用，最终等价于类似这样的代码：
+`<text fg="green">你好</text>` 不是字符串（没有引号包裹），是 JSX 标签。TypeScript 编译器会把它转成函数调用，最终等价于类似这样的代码：
 
 ```ts
 // 简化示意：JSX 标签会被编译成函数调用
-// 实际编译结果是 jsx("text", { color: "green", children: "你好" })
+// 实际编译结果是 jsx("text", { fg: "green", children: "你好" })
 // 这里只是帮你理解"标签 = 函数调用"这个概念
-const greeting = text({ color: "green", children: "你好" })
+const greeting = text({ fg: "green", children: "你好" })
 ```
 
 > Python 类比：Python 没有直接对应。最接近的是 f-string，但 f-string 只能插值，JSX 还能写标签结构、嵌套、属性。如果用过 Jinja2 模板，JSX 类似但写在代码里而不是单独的模板文件。
@@ -29,18 +40,20 @@ const greeting = text({ color: "green", children: "你好" })
 一个 JSX 标签由这几部分组成：
 
 ```
-<text color="green">你好</text>
- ^    ^     ^        ^    ^
- |    |     |        |    |
-标签名 属性名 属性值   子元素 闭合标签
+<text fg="green">你好</text>
+  ^    ^    ^       ^    ^
+  |    |    |       |    |
+ 标签名 属性名 属性值  子元素 闭合标签
 ```
 
 | 部分 | 说明 | 类比 |
 |------|------|------|
 | `text` | 标签名（什么元素） | HTML 的 `<p>`、`<div>` |
-| `color="green"` | 属性（元素的配置） | HTML 的 `class="xxx"` |
+| `fg="green"` | 属性（元素的配置） | HTML 的 `class="xxx"` |
 | `你好` | 子元素（标签里的内容） | HTML 里 `<p>你好</p>` 的"你好" |
 | `</text>` | 闭合标签（表示结束） | HTML 的 `</p>` |
+
+> **属性名对照**：HTML 里文字颜色是 `color`，opentui 的 `<text>` 里叫 `fg`（前景色）/ `bg`（背景色）。写错不报错，只是静默不生效--这是实际调试中踩过的坑。
 
 ## JSX 的 6 条规则
 
@@ -62,18 +75,18 @@ const greeting = text({ color: "green", children: "你好" })
 
 ```tsx
 // 字符串属性：用双引号（或单引号）
-<text color="green">绿色文字</text>
+<text fg="green">绿色文字</text>
 
 // 表达式属性：用花括号 {} 包裹 TypeScript 表达式
-<text color={myColor()}>动态颜色</text>
+<text fg={myColor()}>动态颜色</text>
 
 // 混合使用
 <box border={true} title="聊天">
-  <text color="cyan">文字</text>
+  <text fg="cyan">文字</text>
 </box>
 ```
 
-`color="green"` 和 `color={myColor()}` 的区别：
+`fg="green"` 和 `fg={myColor()}` 的区别：
 - 引号里的值是**字面字符串**：`"green"` 就是字符串 green
 - 花括号里是 **TypeScript 表达式**：`{myColor()}` 会执行 `myColor()` 函数，用返回值作为属性
 
@@ -160,14 +173,14 @@ function Greeting(props: { name: string }) {
 
   return (
     <box flexDirection="column" padding={1}>
-      <text color={color}>你好，{props.name}！</text>
+      <text fg={color}>你好，{props.name}！</text>
       <text>今天是 {new Date().toDateString()}</text>
     </box>
   )
 }
 
 // 使用：
-<Greeting name="世界" />
+// <Greeting name="世界" />
 // 渲染：
 // 你好，世界！（绿色）
 // 今天是 Mon Jul 08 2026
