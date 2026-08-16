@@ -2,6 +2,36 @@
 
 > 本课目标：学会 SolidJS 的三个核心 API--createSignal、createMemo、createEffect，理解它们怎么实现"数据变了 UI 自动更新"。
 
+## 配套代码
+
+本课有可执行示例：`src/tui-demo/03-signals-demo.ts`
+
+```bash
+bun run src/tui-demo/03-signals-demo.ts
+```
+
+四个演示：signal 读写（含「忘了括号」的坑）、memo 缓存（用计算次数计数器证明）、effect 自动执行、三件套联动（订单金额计算器）。
+
+> **先读下面的 Debug 说明**--不配置 `bunfig.toml` 的话，本课所有代码会静默失效。
+
+## 教 Debug：effect 不执行？检查 bunfig.toml
+
+这是实际踩过的坑，值得单独讲。现象：代码完全正确，`createEffect` 一行输出都没有，也不报错。
+
+原因：solid-js 是同构包（浏览器 + 服务器双构建）。它的 package.json 导出条件里，`node` 条件指向 **server 构建**（`dist/server.js`，为 SSR 设计，`createEffect` 是空操作）。Bun 按 node 运行时解析，拿到的就是这个空壳。
+
+解法：项目根目录加 `bunfig.toml`（对照 opencode：`packages/tui/bunfig.toml`）：
+
+```toml
+preload = ["@opentui/solid/preload"]
+```
+
+这个 preload 是个 Bun 插件，做两件事：
+1. 拦截 `solid-js/dist/server.js` 的加载，替换成 `dist/solid.js`（真正的响应式构建）
+2. 用 babel-preset-solid 编译 .tsx（9.2 课讲）
+
+排查过程可以复用：先写最小复现（`createEffect(() => console.log(1))`），确认连初始执行都没有 -> 问题不在你的代码 -> 查依赖解析。用 `bun -e "import { createEffect } from 'solid-js'"` 单独验证，锁定到包构建选择问题。
+
 ## 回顾：响应式的核心思想
 
 上一课我们说了：响应式 = 你声明数据和 UI 的关系，数据变了 UI 自动更新。

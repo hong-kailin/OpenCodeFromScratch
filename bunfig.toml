@@ -1,1 +1,10 @@
-preload = ["./node_modules/@opentui/solid/scripts/preload.js"]
+# bunfig.toml
+# Bun 运行时配置（对照 opencode: packages/tui/bunfig.toml）
+#
+# preload 的作用（来自 @opentui/solid/preload，基于 Bun plugin 机制）：
+# 1. 修复 solid-js 构建选择：Bun 按 "node" 导出条件解析 solid-js，
+#    会拿到 dist/server.js（SSR 构建，createEffect 是空操作）。
+#    preload 插件拦截这个加载，重定向到 dist/solid.js（真正的响应式构建）。
+#    没有它，所有响应式 API 静默失效（不报错，但 effect 永远不执行）
+# 2. 用 babel-preset-solid 编译 .tsx（Solid 的精细编译，详见 9.2 课）
+preload = ["@opentui/solid/preload"]
