@@ -9,6 +9,7 @@ import type { Provider, ChatResult } from "../provider"
 import type { Message, ToolCall } from "../types"
 import type { Tool } from "../tool/tool"
 import { toolToOpenAIFormat } from "../tool/tool"
+import { debug } from "../debug"
 
 // 创建 OpenAI 兼容 Provider
 // config 由 loadConfig() 从 opencode.json 读取
@@ -28,6 +29,14 @@ export function createOpenAIProvider(config: {
       onChunk: (text: string) => void,
     ): Promise<ChatResult> {
       // 发流式请求（带 tools）
+      // 调试：打印 API 请求详情（不打印 apiKey，安全考虑）
+      debug("API 请求:")
+      debug(`  POST ${config.baseURL}/chat/completions`)
+      debug(`  model: ${config.modelID}`)
+      debug(`  messages: ${messages.length} 条`)
+      debug(`  tools: ${tools.map((t) => t.id).join(", ")}`)
+      debug(`  stream: true`)
+
       const response = await fetch(`${config.baseURL}/chat/completions`, {
         method: "POST",
         headers: {
@@ -44,8 +53,13 @@ export function createOpenAIProvider(config: {
 
       if (!response.ok) {
         const errorText = await response.text()
+        debug(`API 错误: ${response.status} ${response.statusText}`)
+        debug(`  响应体: ${errorText}`)
         throw new Error(`API 错误 ${response.status}: ${errorText}`)
       }
+
+      debug(`API 响应: ${response.status} ${response.statusText}`)
+      debug("开始接收 SSE 流式数据...")
 
       const decoder = new TextDecoder()
       let fullText = ""
@@ -62,10 +76,27 @@ export function createOpenAIProvider(config: {
           if (!line.startsWith("data: ")) continue
 
           const data = line.slice(6)
-          if (data === "[DONE]") continue
+          if (data === "[DONE]") {
+            debug("SSE: [DONE]")
+            continue
+          }
 
           const json = JSON.parse(data)
           const delta = json.choices[0]?.delta
+
+          // 调试：打印每个 SSE delta 的关键信息
+          if (delta?.content) {
+            debug(`SSE delta: content="${delta.content}"`)
+          }
+          if (delta?.tool_calls) {
+            for (const tc of delta.tool_calls) {
+              if (tc.id) {
+                debug(`SSE delta: tool_call 新建 index=${tc.index} id=${tc.id} name=${tc.function?.name}`)
+              } else {
+                debug(`SSE delta: tool_call 追加 index=${tc.index} args="${tc.function?.arguments}"`)
+              }
+            }
+          }
 
           // 1. 处理文本增量
           const content = delta?.content
@@ -106,6 +137,8 @@ export function createOpenAIProvider(config: {
           arguments: tc.arguments,
         },
       }))
+
+      debug(`SSE 流结束: 文本 ${fullText.length} 字符, ${toolCalls.length} 个工具调用`)
 
       return { text: fullText, toolCalls }
     },

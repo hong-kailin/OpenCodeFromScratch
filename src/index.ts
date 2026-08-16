@@ -23,6 +23,7 @@ import type { Tool } from "./tool/tool"
 import { createSession, listSessions, getSession } from "./session"
 import { saveMessage, loadMessages } from "./message"
 import { buildSystemPrompt } from "./system-context"
+import { debug, debugMessages } from "./debug"
 
 // ── 工具循环 ──────────────────────────────────────────────
 // agent 的核心：LLM 调用工具 → 执行 → 喂回结果 → 继续调 LLM → 直到不再调用工具
@@ -38,12 +39,22 @@ async function runToolLoop(
   let step = 0
   while (step < MAX_STEPS) {
     step++
+    debug(`── Step ${step}/${MAX_STEPS} ──`)
+
+    // 调试：打印发给 LLM 的完整消息列表
+    debugMessages(messages)
 
     process.stdout.write("AI: ")
     const result = await provider.chatWithTools(messages, tools, (text) => {
       process.stdout.write(text)
     })
     console.log()
+
+    // 调试：打印 LLM 返回的完整结果
+    debug("LLM 返回:", { text: result.text, toolCallsCount: result.toolCalls.length })
+    if (result.toolCalls.length > 0) {
+      debug("tool_calls:", result.toolCalls.map((tc) => `${tc.function.name}(${tc.function.arguments})`))
+    }
 
     // 没有 tool_calls → LLM 说完了，结束循环
     if (result.toolCalls.length === 0) {
@@ -80,6 +91,10 @@ async function runToolLoop(
       const args = JSON.parse(tc.function.arguments)
       console.log(`  [调用工具] ${tc.function.name}(${tc.function.arguments})`)
       const output = await tool.execute(args)
+
+      // 调试：打印工具的完整输出（未截断，和喂给 LLM 的可能不同）
+      debug(`工具 ${tc.function.name} 完整输出 (${output.length} 字符):`)
+      debug(output)
 
       const toolMsg: Message = {
         role: "tool",

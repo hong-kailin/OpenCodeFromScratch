@@ -9,7 +9,7 @@
 - 设置全局状态（环境变量、全局变量）
 - 做跨命令的通用处理（日志、配置加载等）
 
-> Python 类比：Flask 的 `@app.before_request`——每个请求处理前先跑一段代码。yargs middleware 一样，每个命令 handler 前先跑。
+> Python 类比：Flask 的 `@app.before_request`--每个请求处理前先跑一段代码。yargs middleware 一样，每个命令 handler 前先跑。
 
 ## 为什么需要中间件
 
@@ -46,7 +46,7 @@ async (args) => {
 
 所有命令的 handler 执行前，yargs 自动先跑这个中间件。handler 里不用管这些通用逻辑，只管自己的事。
 
-> **工程思维**：中间件解决的是"横切关注点"（cross-cutting concerns）——多个地方都需要、但不属于任何单个命令核心逻辑的功能。日志、认证、配置加载都是典型的横切关注点。
+> **工程思维**：中间件解决的是"横切关注点"（cross-cutting concerns）--多个地方都需要、但不属于任何单个命令核心逻辑的功能。日志、认证、配置加载都是典型的横切关注点。
 
 ## 执行顺序
 
@@ -65,7 +65,7 @@ yargs 的执行顺序：
 3. 调用 builder: 声明 run 命令的参数（message, --continue, --session）
     │
     ▼
-4. 解析参数: 按声明解析 → { message: ["你好"], debug: true, continue: false, ... }
+4. 解析参数: 按声明解析 -> { message: ["你好"], debug: true, continue: false, ... }
     │
     ▼
 5. 调用 middleware: 设置 process.env.DEBUG = "1", process.env.AGENT = "1"
@@ -74,7 +74,7 @@ yargs 的执行顺序：
 6. 调用 handler: 用解析好的 args 执行业务逻辑
 ```
 
-关键：**builder → 解析 → middleware → handler**。middleware 在参数解析完之后、handler 之前运行，所以 middleware 能拿到完整的 `args` 对象。
+关键：**builder -> 解析 -> middleware -> handler**。middleware 在参数解析完之后、handler 之前运行，所以 middleware 能拿到完整的 `args` 对象。
 
 > 对比 builder 和 middleware 的职责：
 > - **builder**：声明"有哪些参数"（声明式）
@@ -115,28 +115,41 @@ yargs(hideBin(process.argv))
 深层代码（比如 `src/provider/openai.ts` 里的 fetch）可能需要知道是否处于调试模式。如果不用环境变量，你得把 `debug` 参数层层传递：
 
 ```
-index.ts → provider → openai.ts → fetch 里打印请求体
+index.ts -> provider -> openai.ts -> fetch 里打印请求体
 ```
 
 每层都要加 `debug` 参数，很烦。用环境变量，深层代码直接 `process.env.DEBUG` 就能读到，不用传参。
 
-> 对照 opencode：它的 middleware 就是这么做的——把 `--print-logs`、`--log-level` 转成 `process.env.OPENCODE_PRINT_LOGS`、`process.env.OPENCODE_LOG_LEVEL`。深层 Effect 代码直接读环境变量，不用层层传参。
+> 对照 opencode：它的 middleware 就是这么做的--把 `--print-logs`、`--log-level` 转成 `process.env.OPENCODE_PRINT_LOGS`、`process.env.OPENCODE_LOG_LEVEL`。深层 Effect 代码直接读环境变量，不用层层传参。
 
 ### `global: true` 的作用
 
-yargs 的选项默认只对当前命令有效。`global: true` 让选项对所有命令都有效——不管你定义在哪个位置，所有命令的 handler 都能收到这个参数。
+yargs 的选项默认只对定义它的命令有效。`global: true` 让选项对**所有子命令**生效--不用每个命令重复声明。
 
 ```ts
 // 不加 global: true
 .option("debug", { type: "boolean" })
-// 只有定义它的命令能用 --debug
+// 只有顶层能用 --debug，子命令里用会被 .strict() 拒绝（未知选项）
 
 // 加 global: true
 .option("debug", { type: "boolean", global: true })
-// 所有命令都能用 --debug
+// 所有子命令都能用 --debug
 ```
 
-我们目前只有 `run` 一个命令，差别不大。但 opencode 有 23 个命令，全局选项就很重要——`--debug` 对所有 23 个命令都有效。
+当前只有一个 `run` 命令，看不出区别。但以后加了更多命令时效果就明显了：
+
+```ts
+yargs(hideBin(process.argv))
+  .option("debug", { global: true })   // 所有命令共享
+  .command("run", "运行 agent", ...)       // bun ... run --debug       ✓
+  .command("serve", "启动服务器", ...)      // bun ... serve --debug     ✓
+  .command("session list", ...)             // bun ... session list --debug ✓
+  .strict()  // 拒绝未知选项，但 global 选项不算"未知"
+```
+
+如果不加 `global: true`，`serve` 和 `session list` 命令里用 `--debug` 会被 `.strict()` 报错"Unknown argument"。加了 `global: true` 后，yargs 知道这个选项是全局的，所有命令都认。
+
+对照 opencode：它的 `--print-logs`、`--log-level` 也是 global 选项（`packages/opencode/src/index.ts`），23 个命令都能用。
 
 ## 运行
 
@@ -171,14 +184,14 @@ opencode 的 middleware（`src/index.ts:66-78`）：
 })
 ```
 
-和我们的思路一样：**yargs 选项 → 环境变量 → 深层代码读取**。opencode 多了 `Heap.start()`（内存快照）和 `OPENCODE_PID`（进程 ID），我们不需要。
+和我们的思路一样：**yargs 选项 -> 环境变量 -> 深层代码读取**。opencode 多了 `Heap.start()`（内存快照）和 `OPENCODE_PID`（进程 ID），我们不需要。
 
 ## 本课小结
 
 1. **中间件** = handler 之前运行的函数，做跨命令的通用处理
-2. **执行顺序**：builder（声明参数）→ 解析 → middleware（前置处理）→ handler（核心逻辑）
-3. **横切关注点**：日志、环境变量、认证等——多个命令都需要、但不属于任何单个命令核心逻辑的功能
+2. **执行顺序**：builder（声明参数）-> 解析 -> middleware（前置处理）-> handler（核心逻辑）
+3. **横切关注点**：日志、环境变量、认证等--多个命令都需要、但不属于任何单个命令核心逻辑的功能
 4. **选项转环境变量**：深层代码不用层层传参，直接读 `process.env`
-5. **`global: true`**：让选项对所有命令有效
+5. **`global: true`**：让选项对所有子命令有效，配合 `.strict()` 不会报未知选项
 
-下一步：[8.3 对照 opencode + 阶段验收](../03-stage-review/) —— CLI 架构对比 + 验收。
+下一步：[8.3 对照 opencode + 阶段验收](../03-stage-review/) -- CLI 架构对比 + 验收。
