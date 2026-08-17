@@ -447,11 +447,11 @@ opencode-from-scratch/
   - 把 Provider 重构成 `ProviderService`（封装 createOpenAIProvider）
   - 把 tools 数组重构成 `ToolRegistry` 服务（注册一次，到处可取）
   - 重构 `runAgentLoop`：签名从 `(messages, provider, tools, callbacks)` 变成 `(messages, callbacks)`，provider/tools 从 Context 取
-  - 同步重构 CLI 版 `runToolLoop`
+  - **合并两个重复的 loop**：CLI 版 `runToolLoop` 和 TUI 版 `runAgentLoop` 合成一个，持久化差异用 `onMessage` 回调注入
   - 验证：加第 7 个工具只改一处（ToolRegistry 的 Layer）
   - `Effect.fn("Name")(function* () {...})`：opencode 的标志性模式，给函数加 trace 名
-  - Layer 组装：入口处 `mainEffect.pipe(Effect.provide(Layer.mergeAll(ConfigLayer, ProviderLayer, ToolRegistryLayer)))`
-  - 对照 opencode：`core/src/tool/registry.ts`（Tool 注册表）、`llm/src/route/client.ts`（LLMClient 消费方）
+  - Layer 组装：入口处 `mainEffect.pipe(Effect.provide(appLayers))`，`appLayers = Layer.mergeAll(...)`；**注意 Layer 依赖要显式喂**——`providerLayer.pipe(Layer.provide(configLayer))`，mergeAll 不会自动解析 Layer 间的依赖（直接 mergeAll 三个会 typecheck 报错）
+  - 对照 opencode：`core/src/tool/registry.ts`（Tool 注册表）、`llm/src/route/client.ts`（LLMClient 消费方，其末尾用 `Layer.provideMerge` 处理 Layer 依赖）
   - 产出：agent loop 从 Context 取依赖，参数不再层层传
 
 - **10.5 Effect Schema：运行时校验**

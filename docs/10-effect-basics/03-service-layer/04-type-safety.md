@@ -74,4 +74,4 @@ ConfigService 还没接入真实的 `index.ts` 和 `agent.tsx`--那需要把入�
 
 ---
 
-下一步：[10.4 用 Service 重构 agent loop](../04-refactor-agent-loop/01-refactor-agent-loop.md) -- ProviderService + ToolRegistry，agent loop 从 Context 取依赖。
+下一步：[10.4 用 Service 重构 agent loop](../04-refactor-agent-loop/01-provider-service.md) -- ProviderService + ToolRegistry，agent loop 从 Context 取依赖。
