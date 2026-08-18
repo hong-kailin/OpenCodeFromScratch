@@ -5,46 +5,110 @@
 //   bun run src/index.ts run "你好"       # 非交互模式（发一条消息，退出）
 //   bun run src/index.ts run -c           # 恢复上次会话
 //   bun run src/index.ts run -s ses_xxx   # 恢复指定 session
-//
-// 10.4 课重构：
-// 1. 删掉了原来的 runToolLoop（和 agent-loop.ts 的 runAgentLoop 重复），
-//    统一用 runAgentLoop，持久化通过 onMessage 回调注入
-// 2. provider 和 tools 不再在这里创建，改成在入口用 Layer.mergeAll 组装，
-//    runAgentLoop 从 Context 自取
 
 import yargs from "yargs"
 import { hideBin } from "yargs/helpers"
-import { Effect, Layer } from "effect"
 import type { Message } from "./types"
-import { ConfigService, configLayer } from "./service/config"
-import { ProviderService, providerLayer } from "./service/provider"
-import { ToolRegistry, toolRegistryLayer } from "./service/tool-registry"
-import { runAgentLoop, type LoopCallbacks } from "./agent-loop"
+import { loadConfig } from "./llm"
+import { createOpenAIProvider } from "./provider/openai"
+import type { Provider } from "./provider"
+import { readTool } from "./tool/read"
+import { writeTool } from "./tool/write"
+import { editTool } from "./tool/edit"
+import { bashTool } from "./tool/bash"
+import { globTool } from "./tool/glob"
+import { grepTool } from "./tool/grep"
+import { truncate } from "./tool/truncate"
+import type { Tool } from "./tool/tool"
 import { createSession, listSessions, getSession } from "./session"
 import { saveMessage, loadMessages } from "./message"
 import { buildSystemPrompt } from "./system-context"
-import { debug } from "./debug"
+import { debug, debugMessages } from "./debug"
 
-// ── 组装所有 Layer ─────────────────────────────────────────
-// 注意 providerLayer 需要 ConfigService，所以要先用 Layer.provide 把 configLayer
-// 喂给它，再 mergeAll。不能直接 mergeAll(三个)——mergeAll 的类型不会自动解析
-// Layer 内部的依赖（providerLayer 的"需要 ConfigService"需求会残留）。
-// 对照 opencode: core/src/tool/registry.ts 的 layer.pipe(Layer.provideMerge(registryLayer))
-// （provideMerge 是 provide + merge 一步到位，我们这里拆开写更容易懂）
-const appLayers = Layer.mergeAll(
-  // providerLayer 的需求（ConfigService）由 configLayer 满足，结果：只提供 ProviderService
-  providerLayer.pipe(Layer.provide(configLayer)),
-  // toolRegistryLayer 没有依赖，直接合并
-  toolRegistryLayer,
-)
+// ── 工具循环 ──────────────────────────────────────────────
+// agent 的核心：LLM 调用工具 → 执行 → 喂回结果 → 继续调 LLM → 直到不再调用工具
+// 对照 opencode: session/prompt.ts 的 runLoop
+async function runToolLoop(
+  messages: Message[],
+  sessionId: string,
+  provider: Provider,
+  tools: Tool[],
+): Promise<void> {
+  const MAX_STEPS = 20 // 防止无限循环
 
-// ── 跑 agent loop 的公共函数 ───────────────────────────────
-// messages + callbacks → 组装 Effect → provide 依赖 → runPromise
-// 原来这段要传 provider、tools，现在依赖都在 Context 里，只需传业务参数
-async function runLoop(messages: Message[], callbacks: LoopCallbacks): Promise<void> {
-  await Effect.runPromise(
-    runAgentLoop(messages, callbacks).pipe(Effect.provide(appLayers)),
-  )
+  let step = 0
+  while (step < MAX_STEPS) {
+    step++
+    debug(`── Step ${step}/${MAX_STEPS} ──`)
+
+    // 调试：打印发给 LLM 的完整消息列表
+    debugMessages(messages)
+
+    process.stdout.write("AI: ")
+    const result = await provider.chatWithTools(messages, tools, (text) => {
+      process.stdout.write(text)
+    })
+    console.log()
+
+    // 调试：打印 LLM 返回的完整结果
+    debug("LLM 返回:", { text: result.text, toolCallsCount: result.toolCalls.length })
+    if (result.toolCalls.length > 0) {
+      debug("tool_calls:", result.toolCalls.map((tc) => `${tc.function.name}(${tc.function.arguments})`))
+    }
+
+    // 没有 tool_calls → LLM 说完了，结束循环
+    if (result.toolCalls.length === 0) {
+      const assistantMsg: Message = { role: "assistant", content: result.text }
+      messages.push(assistantMsg)
+      await saveMessage(sessionId, assistantMsg)
+      break
+    }
+
+    // 有 tool_calls → 把 assistant 消息（带 tool_calls）加入 messages
+    const assistantMsg: Message = {
+      role: "assistant",
+      content: result.text || null,
+      tool_calls: result.toolCalls,
+    }
+    messages.push(assistantMsg)
+    await saveMessage(sessionId, assistantMsg)
+
+    // 执行每个工具，把结果以 role: "tool" 加入 messages
+    for (const tc of result.toolCalls) {
+      const tool = tools.find((t) => t.id === tc.function.name)
+      if (!tool) {
+        console.log(`  [错误] 找不到工具: ${tc.function.name}`)
+        const errorMsg: Message = {
+          role: "tool",
+          tool_call_id: tc.id,
+          content: `错误：找不到工具 ${tc.function.name}`,
+        }
+        messages.push(errorMsg)
+        await saveMessage(sessionId, errorMsg)
+        continue
+      }
+
+      const args = JSON.parse(tc.function.arguments)
+      console.log(`  [调用工具] ${tc.function.name}(${tc.function.arguments})`)
+      const output = await tool.execute(args)
+
+      // 调试：打印工具的完整输出（未截断，和喂给 LLM 的可能不同）
+      debug(`工具 ${tc.function.name} 完整输出 (${output.length} 字符):`)
+      debug(output)
+
+      const toolMsg: Message = {
+        role: "tool",
+        tool_call_id: tc.id,
+        content: truncate(output),
+      }
+      messages.push(toolMsg)
+      await saveMessage(sessionId, toolMsg)
+    }
+  }
+
+  if (step >= MAX_STEPS) {
+    console.log("  [达到最大步数限制，停止循环]")
+  }
 }
 
 // ── CLI 定义 ──────────────────────────────────────────────
@@ -78,19 +142,23 @@ yargs(hideBin(process.argv))
         .option("continue", { alias: "c", type: "boolean", description: "恢复上次会话" })
         .option("session", { alias: "s", type: "string", description: "恢复指定 session ID" }),
     async (args) => {
-      // 1. system prompt（不存数据库，每次启动重新生成）
+      // 1. 读配置 + 创建 Provider + 注册工具
+      const config = await loadConfig()
+      const provider: Provider = createOpenAIProvider(config)
+      const tools: Tool[] = [readTool, writeTool, editTool, bashTool, globTool, grepTool]
+
+      // 2. system prompt（不存数据库，每次启动重新生成）
       const systemPrompt: Message = {
         role: "system",
         content: buildSystemPrompt(),
       }
 
-      // 2. 调试模式（VSCode Debug Console 不支持 stdin）
+      // 3. 调试模式（VSCode Debug Console 不支持 stdin）
       const debugInputs = process.env.DEBUG_INPUTS
         ? (JSON.parse(process.env.DEBUG_INPUTS) as string[])
         : null
 
-      // 3. 决定 session：--session > --continue > 新建/选择
-      //    这段逻辑没变（session 还没服务化，是 11+ 阶段的活）
+      // 4. 决定 session：--session > --continue > 新建/选择
       let sessionId: string
       let messages: Message[]
 
@@ -171,36 +239,13 @@ yargs(hideBin(process.argv))
         }
       }
 
-      // 4. 构造回调：CLI 版把事件打印到终端，同时持久化到数据库
-      //    onMessage 就是 10.4 新增的钩子——每次 loop 加消息都存库
-      const callbacks: LoopCallbacks = {
-        // 流式文本：写到 stdout（带 "AI: " 前缀，和原来 runToolLoop 一致）
-        onChunk(text) {
-          process.stdout.write(text)
-        },
-        // 工具开始调用：打印一行
-        onToolCall(id, name, args) {
-          console.log(`  [调用工具] ${name}(${args})`)
-        },
-        // 工具执行完毕：打印结果摘要
-        onToolResult(id, output) {
-          debug(`工具结果 (${output.length} 字符):`)
-          debug(output)
-        },
-        // 持久化：每次加消息都存库（原来是 runToolLoop 里手动 saveMessage）
-        onMessage(msg) {
-          void saveMessage(sessionId, msg)
-        },
-      }
-
       // 5. 非交互模式：发一条消息，退出
       if (args.message && args.message.length > 0) {
         const input = args.message.join(" ")
         const userMsg: Message = { role: "user", content: input }
         messages.push(userMsg)
         await saveMessage(sessionId, userMsg)
-        console.log("AI: ")
-        await runLoop(messages, callbacks)
+        await runToolLoop(messages, sessionId, provider, tools)
         return
       }
 
@@ -216,8 +261,7 @@ yargs(hideBin(process.argv))
         messages.push(userMsg)
         await saveMessage(sessionId, userMsg)
 
-        console.log("AI: ")
-        await runLoop(messages, callbacks)
+        await runToolLoop(messages, sessionId, provider, tools)
       }
     },
   )

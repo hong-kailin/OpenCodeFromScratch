@@ -1,6 +1,5 @@
 // src/tui/agent.tsx
 // 9.5 课教学代码：工具调用展示 + 阶段验收
-// 10.4 课重构：provider 和 tools 改成从 Context 取，不再在这里创建
 // 跑法：bun run src/tui/agent.tsx
 //
 // 在 9.4 课基础上改进工具调用的显示：
@@ -17,12 +16,16 @@ import { render, useKeyboard } from "@opentui/solid"
 import { createSignal, For, Show } from "solid-js"
 import type { TextareaRenderable } from "@opentui/core"
 import "opentui-spinner/solid" // 副作用导入：注册 <spinner> 自定义元素（对照 opencode 的 component/spinner.tsx）
-import { Effect, Layer } from "effect"
-import { configLayer } from "../service/config"
-import { providerLayer } from "../service/provider"
-import { toolRegistryLayer } from "../service/tool-registry"
-import { runAgentLoop } from "../agent-loop"
+import { loadConfig } from "../llm"
+import { createOpenAIProvider } from "../provider/openai"
+import { readTool } from "../tool/read"
+import { writeTool } from "../tool/write"
+import { editTool } from "../tool/edit"
+import { bashTool } from "../tool/bash"
+import { globTool } from "../tool/glob"
+import { grepTool } from "../tool/grep"
 import { buildSystemPrompt } from "../system-context"
+import { runAgentLoop } from "../agent-loop"
 import type { Message } from "../types"
 
 // Braille 盲文字符的旋转动画帧，CLI spinner 的经典做法（对照 opencode 的 SPINNER_FRAMES）
@@ -65,13 +68,9 @@ function App() {
     setMessages((prev) => [...prev, { role: "user", content: text }])
 
     try {
-      // 10.4 重构：provider 和 tools 不再在这里创建（原来是 loadConfig + createOpenAIProvider + 工具数组）
-      // 而是组装 Layer 交给 runAgentLoop 从 Context 取
-      // 注意 providerLayer 需要 ConfigService，用 Layer.provide 先喂给 providerLayer 再 mergeAll
-      const appLayers = Layer.mergeAll(
-        providerLayer.pipe(Layer.provide(configLayer)),
-        toolRegistryLayer,
-      )
+      const config = await loadConfig()
+      const provider = createOpenAIProvider(config)
+      const tools = [readTool, writeTool, editTool, bashTool, globTool, grepTool]
 
       // 内部 messages 数组：发给 LLM 用的完整消息（含 system prompt）
       const internalMessages: Message[] = [
@@ -80,51 +79,46 @@ function App() {
       ]
 
       // 跑 agent loop，用回调更新 TUI
-      // runAgentLoop(messages, callbacks) 现在只需要业务参数，
-      // provider/tools 通过 Effect.provide 装配进 Context
-      await Effect.runPromise(
-        runAgentLoop(internalMessages, {
-          // 流式文本：收到 chunk 就追加到最后一条 assistant 消息
-          // 如果最后一条不是 assistant（比如刚加完 user 消息），就新建一条
-          onChunk(chunk) {
-            setMessages((prev) => {
-              const last = prev[prev.length - 1]!
-              if (last.role !== "assistant") {
-                return [...prev, { role: "assistant", content: chunk }]
-              }
-              return [
-                ...prev.slice(0, -1),
-                { ...last, content: last.content + chunk },
-              ]
-            })
-          },
-          // 工具开始调用：新增一条 status=running 的工具消息
-          // id 来自 LLM 返回的 tool_call.id，等结果回来时用它找到这条记录更新
-          onToolCall(id, name, args) {
-            setMessages((prev) => [
-              ...prev,
-              {
-                role: "tool",
-                content: "",
-                toolName: name,
-                toolArgs: args,
-                toolStatus: "running",
-              },
-            ])
-          },
-          // 工具执行完毕：用 id 找到刚才那条"执行中"的记录，更新为"已完成"并填入结果
-          onToolResult(id, output) {
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.role === "tool" && msg.toolStatus === "running"
-                  ? { ...msg, toolStatus: "completed", content: output }
-                  : msg,
-              ),
-            )
-          },
-          // TUI 不需要持久化，所以不传 onMessage（可选回调）
-        }).pipe(Effect.provide(appLayers)),
-      )
+      await runAgentLoop(internalMessages, provider, tools, {
+        // 流式文本：收到 chunk 就追加到最后一条 assistant 消息
+        // 如果最后一条不是 assistant（比如刚加完 user 消息），就新建一条
+        onChunk(chunk) {
+          setMessages((prev) => {
+            const last = prev[prev.length - 1]!
+            if (last.role !== "assistant") {
+              return [...prev, { role: "assistant", content: chunk }]
+            }
+            return [
+              ...prev.slice(0, -1),
+              { ...last, content: last.content + chunk },
+            ]
+          })
+        },
+        // 工具开始调用：新增一条 status=running 的工具消息
+        // id 来自 LLM 返回的 tool_call.id，等结果回来时用它找到这条记录更新
+        onToolCall(id, name, args) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "tool",
+              content: "",
+              toolName: name,
+              toolArgs: args,
+              toolStatus: "running",
+            },
+          ])
+        },
+        // 工具执行完毕：用 id 找到刚才那条"执行中"的记录，更新为"已完成"并填入结果
+        onToolResult(id, output) {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.role === "tool" && msg.toolStatus === "running"
+                ? { ...msg, toolStatus: "completed", content: output }
+                : msg,
+            ),
+          )
+        },
+      })
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err)
       setMessages((prev) => [

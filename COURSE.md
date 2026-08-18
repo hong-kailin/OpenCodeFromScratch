@@ -203,7 +203,7 @@ opencode-from-scratch/
   - 捕获 stdout/stderr/exit code
   - 命令超时处理
   - 对照 opencode：看 `tool/shell.ts` 和 `tool/shell/shell.txt`
-  - 安全考虑：为什么不直接给 LLM shell 访问（阶段 10 的权限系统预告）
+  - 安全考虑：为什么不直接给 LLM shell 访问（阶段 20 的权限系统预告）
 
 - **4.3 grep + glob：搜索工具**
   - glob 工具：按文件名模式匹配（`**/*.ts`）
@@ -405,13 +405,12 @@ opencode-from-scratch/
   - 工程思维：TUI 是"渲染层"——只管显示，不管业务逻辑
 
 
-### 阶段 10：Effect-TS 入门（从痛点出发）
-
-> **目标**：引入 Effect-TS（v4 beta，对齐 opencode）的核心三件套--Service/Layer（依赖注入）、Stream（流式）、Schema（运行时校验），用它们重构现有 agent loop。功能完全不变，但架构从"裸 async/await + 参数到处传"升级到"Effect 服务化"。
+### 阶段 10：Effect 基础（延迟的计算描述）
+> **目标**：引入 Effect-TS（v4 beta，对齐 opencode）的核心概念——Effect 是"计算的描述"而非"计算的执行"。理解 Effect.gen + yield* 的思维模式，能用 Effect 写简单的计算描述。
 >
-> **为什么现在做**：前 9 阶段我们用裸 async/await，能跑。但随着功能增多，config、provider、db、session 这些依赖要在每个函数间手动传递，越来越乱。这正是 opencode 用 Effect-TS 的根本原因--Service/Layer 提供依赖注入，让"谁需要什么服务"由 Context 自动提供，不用层层传参。先感受到痛点，再用 Effect 解决，理解才深刻。
+> **为什么现在做**：前 9 阶段我们用裸 async/await，能跑。但 opencode 的整个架构建立在 Effect-TS 之上——后续的 monorepo 拆分、事件溯源、Route、Server 全都建立在 Effect 之上。先学 Effect 最核心的范式：延迟计算、描述 vs 执行、gen + yield* 的串联方式。不碰 Service/Layer/Schema/Stream，只把"Effect 是什么"这个根概念吃透。
 >
-> **版本说明**：opencode v1.17.13 用的是 `effect@4.0.0-beta.83`。本阶段用 v4 beta 的新 API（`Context.Service<Self, Interface>()("id")`，不是旧版 `Context.Tag`），保证和 opencode 源码 1:1 对齐。
+> **版本说明**：opencode v1.17.13 用的是 `effect@4.0.0-beta.83`。本项目用 v4 beta 的新 API，保证和 opencode 源码 1:1 对齐。
 
 #### 课程
 
@@ -419,13 +418,13 @@ opencode-from-scratch/
   - 盘点当前代码：`loadConfig()`、`createOpenAIProvider(config)`、tools 数组在 `index.ts` 和 `agent.tsx` **各重复一份**
   - 实操验证痛点：加第 7 个工具，必须改两处；想共享 db 连接，没有全局位置
   - `runToolLoop(messages, sessionId, provider, tools)` 的参数越加越多
-  - 引入概念：依赖注入（DI）--让依赖"按需自取"而非"层层传递"
+  - 引入概念：依赖注入（DI）——让依赖"按需自取"而非"层层传递"
   - Python 类比：FastAPI 的 `Depends`、Flask 的 `current_app`、一个全局 registry
   - 本课不写 Effect，只让痛点可见，建立"我们需要 DI 容器"的动机
 
-- **10.2 Effect 基础：一个延迟的计算描述**
+- **10.2 Effect 基础：延迟的计算描述**
   - 安装 effect（v4 beta）：`bun add effect@beta`
-  - Effect 是什么：不是 Promise，是**计算的描述**（lazy）--先写好"recipe"，run 时才执行
+  - Effect 是什么：不是 Promise，是**计算的描述**（lazy）——先写好"recipe"，run 时才执行
   - `Effect.gen(function* () { ... })` + `yield*`（对照 Python 的 async generator + await）
   - `Effect.succeed(x)` / `Effect.fail(err)` / `Effect.promise(() => fetch(...))`
   - `Effect.runPromise(effect)`：把 Effect 跑起来（对照 `asyncio.run`）
@@ -434,52 +433,9 @@ opencode-from-scratch/
   - 对照 opencode：`packages/cli/src/commands/handlers/default.ts`（最简 Effect.gen handler）
   - 产出：一个跑通的最小 Effect 程序（`bun run src/effect-demo.ts` 打印结果）
 
-- **10.3 Service + Layer：依赖注入**
-  - 三件套：Interface（声明能力）+ Service（`Context.Service<Self, Interface>()("id")` 创建 tag）+ Layer（`Layer.effect(tag, Effect.gen 造实现)`）
-  - 消费：`yield* SomeService` 从 Context 取实例（对照 Python：从 DI 容器取依赖）
-  - 提供：`Effect.provide(SomeLayer)` 把实现塞进 Context
-  - 动手：把 `loadConfig()` 重构成 `ConfigService`--Interface 声明 `get()`，Layer 读 opencode.json
-  - `index.ts` 和 `agent.tsx` 都通过 `yield* ConfigService` 取 config，不再各自 `loadConfig()`
-  - 对照 opencode：`core/src/session/store.ts`（最简洁的 Service 三件套范例）、`core/src/database/database.ts`
-  - 产出：ConfigService，两处调用统一从 Context 取
-
-- **10.4 用 Service 重构 agent loop**
-  - 把 Provider 重构成 `ProviderService`（封装 createOpenAIProvider）
-  - 把 tools 数组重构成 `ToolRegistry` 服务（注册一次，到处可取）
-  - 重构 `runAgentLoop`：签名从 `(messages, provider, tools, callbacks)` 变成 `(messages, callbacks)`，provider/tools 从 Context 取
-  - **合并两个重复的 loop**：CLI 版 `runToolLoop` 和 TUI 版 `runAgentLoop` 合成一个，持久化差异用 `onMessage` 回调注入
-  - 验证：加第 7 个工具只改一处（ToolRegistry 的 Layer）
-  - `Effect.fn("Name")(function* () {...})`：opencode 的标志性模式，给函数加 trace 名
-  - Layer 组装：入口处 `mainEffect.pipe(Effect.provide(appLayers))`，`appLayers = Layer.mergeAll(...)`；**注意 Layer 依赖要显式喂**——`providerLayer.pipe(Layer.provide(configLayer))`，mergeAll 不会自动解析 Layer 间的依赖（直接 mergeAll 三个会 typecheck 报错）
-  - 对照 opencode：`core/src/tool/registry.ts`（Tool 注册表）、`llm/src/route/client.ts`（LLMClient 消费方，其末尾用 `Layer.provideMerge` 处理 Layer 依赖）
-  - 产出：agent loop 从 Context 取依赖，参数不再层层传
-
-- **10.5 Effect Schema：运行时校验**
-  - `Schema.Struct` / `Schema.Class`：声明式数据契约（对照 dataclass + pydantic）
-  - `Schema.decodeUnknown(Schema)(input)`：解析 + 校验，失败返回 typed error
-  - 动手：把 `JSON.parse(tc.function.arguments)` 换成 Schema 校验的工具参数解析
-  - 把 `Message` 类型用 Schema 重写（既当类型又当校验器）
-  - Schema 的双重身份：编译期是 TS 类型，运行期是校验器
-  - 对照 opencode：`packages/schema/src/` 的领域 schema（后续阶段 11 搬进 schema 包）
-  - 产出：工具参数、消息结构有运行时校验，不再裸 JSON.parse
-
-- **10.6 Effect Stream：流式重写**
-  - Stream：惰性拉取式异步序列（对照 Python async iterator，但组合子丰富）
-  - `Stream.fromIterable` / `Stream.map` / `Stream.runForEach` / `Stream.runFold` / `Stream.tap`
-  - 动手：把 `chatWithTools` 的流式输出从 ReadableStream 改成 Effect Stream
-  - onChunk 回调用 `Stream.runForEach` 驱动；完整文本用 `Stream.runFold` 聚合
-  - Stream 的组合性：`stream.pipe(Stream.map(...), Stream.filter(...))` 链式组装
-  - 对照 opencode：`llm/src/protocols/shared.ts`（SSE 分帧的 Stream 组合子大全）、`llm/example/tutorial.ts`
-  - 产出：流式输出用 Effect Stream，可组合、可中断
-
-- **10.7 typed error + 阶段验收**
-  - `Schema.TaggedError` / `Data.TaggedError`：带 tag 的类型化错误（对照 Python 的自定义异常类）
-  - `Effect.catchTag("TagName", ...)` / `Effect.catchAll`：精确捕获
-  - 动手：把 `throw new Error("字符串")` 换成 typed error（ConfigError / LLMError / ToolError）
-  - 验收：typecheck 通过、CLI + TUI 都能跑、功能与阶段 9 一致
-  - 对照 opencode：`llm` 包的 `LLMError`、`Schema.TaggedError` 用法
-  - 工程思维总结：Effect 三件套各自解决什么、为什么要"描述而非执行"、DI 的 trade-off
-  - 产出：完整 Effect 重构，typed error，阶段 10 验收通过
+- **10.3 阶段验收**
+  - 验收：能写出 Effect.gen + yield* 串行多步计算，理解延迟执行的顺序
+  - 工程思维：为什么要"描述而非执行"——组合性来自延迟
 
 #### 阶段产出
 
@@ -487,22 +443,164 @@ opencode-from-scratch/
 opencode-from-scratch/
 ├── package.json              # 新增 effect 依赖
 └── src/
-    ├── effect-demo.ts        # 10.2 最小 Effect 程序
-    ├── service/              # 10.3-10.4 Service 定义
-    │   ├── config.ts         # ConfigService
-    │   ├── provider.ts       # ProviderService
-    │   └── tool-registry.ts  # ToolRegistry
-    ├── agent-loop.ts         # 重构：从 Context 取依赖
-    ├── provider/openai.ts    # 重构：返回 Effect Stream
+    └── effect-demo.ts        # 10.2 最小 Effect 程序
+```
+
+
+### 阶段 11：Service + Layer（依赖注入）
+
+> **目标**：引入 Effect-TS 的 Service + Layer 机制，实现依赖注入。把 ConfigService 从"手动传参"升级成"Context 自动提供"。
+>
+> **为什么现在做**：阶段 10 学会了 Effect 基本范式，但痛点（依赖到处传）还没解决。Service/Layer 正是 Effect 的解法——Service 声明"我需要什么"，Layer 提供"怎么造"，Context 在运行时自动匹配。不碰 agent loop 重构，只聚焦 DI 机制本身。
+
+#### 课程
+
+- **11.1 Service 是什么：声明能力**
+  - Interface（声明能力清单）+ Context.Service（创建 tag，全局唯一标识）
+  - 对照 opencode：`core/src/session/store.ts`（最简洁的 Service 三件套范例）
+  - 动手：定义 ConfigServiceApi interface + ConfigService tag
+
+- **11.2 Layer 提供实现：工具管理处**
+  - Layer.effect(tag, Effect.gen 造实现)：函数体只跑一次，所有消费者共享
+  - ConfigService.of(...)：把实现包装进 Context
+  - 消费：`yield* ConfigService` 从 Context 取实例
+  - 提供：`Effect.provide(configLayer)` 把实现塞进 Context
+  - 产出：ConfigService，`service-demo.ts` 演示两个消费者共享同一份
+
+- **11.3 Layer 依赖 + 型安全**
+  - Layer 也可以消费别的 Service：providerLayer 需要 yield* ConfigService
+  - ProviderService + ToolRegistry 的 Service 三件套
+  - Layer.provide 的显式依赖：`providerLayer.pipe(Layer.provide(configLayer))`
+  - mergeAll 不会自动解析 Layer 间的依赖，直接 mergeAll 会 typecheck 报错
+  - 对照 opencode：`llm/src/route/client.ts`（末尾用 `Layer.provideMerge` 处理 Layer 依赖）
+  - 产出：ProviderService + ToolRegistry，三个 Service 的 Layer 依赖链
+
+- **11.4 阶段验收**
+  - 验收：typecheck 通过、`service-demo.ts` 跑通、三个 Service 从 Context 自取
+  - 工程思维：DI 的核心——"谁需要什么"声明出来，由 Context 在运行时注入
+
+#### 阶段产出
+
+```
+opencode-from-scratch/
+└── src/
+    ├── service-demo.ts       # 11.2 两个消费者共享 ConfigService
+    ├── service/
+    │   ├── config.ts         # ConfigService 三件套
+    │   ├── provider.ts       # ProviderService（依赖 ConfigService）
+    │   └── tool-registry.ts  # ToolRegistry（独立，无依赖）
+```
+
+
+### 阶段 12：用 Effect 重构 agent loop
+
+> **目标**：把阶段 11 学到的 Service/Layer 应用到 agent loop，重构 runAgentLoop 从"参数层层传"变成"依赖从 Context 自取"，合并 CLI 和 TUI 的两个重复 loop。
+>
+> **为什么现在做**：前两阶段学了 Effect 是什么 + Service 怎么用，这个阶段是"学完练手"——把已有代码按 Effect 风格重写，功能不变，架构升级。
+
+#### 课程
+
+- **12.1 重构 agent loop：签名瘦身**
+  - 重构 `runAgentLoop`：签名从 `(messages, provider, tools, callbacks)` 变成 `(messages, callbacks)`
+  - provider / tools 从 Context 自取：`yield* ProviderService`、`yield* ToolRegistry`
+  - `Effect.fn("Name")(function* () {...})`：opencode 的标志性模式，给函数加 trace 名
+
+- **12.2 合并 CLI + TUI 双 loop**
+  - CLI 版 `runToolLoop` 和 TUI 版 `runAgentLoop` 合成一个
+  - 持久化差异用 `onMessage` 回调注入
+  - 验证：加第 7 个工具只改一处（ToolRegistry 的 Layer）
+
+- **12.3 Layer 组装 + 阶段验收**
+  - 入口处 `mainEffect.pipe(Effect.provide(appLayers))`，`appLayers = Layer.mergeAll(...)`
+  - 验收：typecheck 通过、CLI + TUI 都能跑、功能与阶段 9 一致
+  - 工程思维：Service/Layer 的实战价值——加工具改一处、loop 不再知道依赖细节
+
+#### 阶段产出
+
+```
+opencode-from-scratch/
+└── src/
+    ├── agent-loop.ts         # 重构：从 Context 取依赖，签名瘦身
     ├── index.ts              # 重构：入口组装 Layer
     └── tui/agent.tsx         # 重构：从 Context 取依赖
 ```
 
-> 全程功能不变，只是"骨架"从 async/await 换成 Effect。这是后续阶段 11-21 的地基--monorepo 拆分、事件溯源、Route、Server 全都建立在 Effect Service/Layer/Stream 之上。
+
+### 阶段 13：Effect Schema + Typed Errors
+
+> **目标**：引入 Effect Schema 做运行时校验，替换裸 JSON.parse；引入 TaggedError 做类型化错误，替换 `throw new Error("字符串")`。
+>
+> **为什么现在做**：当前工具参数解析用 `JSON.parse(tc.function.arguments)` 没有任何校验，类型不匹配会静默失败。错误处理用 `throw new Error("字符串")`，调用方无法精确捕获。Schema 提供"编译期类型 + 运行期校验"双重身份，TaggedError 让错误能被精确匹配。
+
+#### 课程
+
+- **13.1 Schema 基础：声明式数据契约**
+  - `Schema.Struct` / `Schema.Class`：声明式定义（对照 dataclass + pydantic）
+  - `Schema.decodeUnknown(Schema)(input)`：解析 + 校验，失败返回 typed error
+  - Schema 的双重身份：编译期是 TS 类型，运行期是校验器
+
+- **13.2 用 Schema 校验工具参数**
+  - 动手：把 `JSON.parse(tc.function.arguments)` 换成 Schema 校验
+  - 把 `Message` 类型用 Schema 重写（既当类型又当校验器）
+  - 对照 opencode：`packages/schema/src/` 的领域 schema
+
+- **13.3 Typed Errors：精确捕获**
+  - `Schema.TaggedError` / `Data.TaggedError`：带 tag 的类型化错误（对照 Python 的自定义异常类）
+  - `Effect.catchTag("TagName", ...)` / `Effect.catchAll`：精确捕获
+  - 动手：把 `throw new Error("字符串")` 换成 typed error（ConfigError / LLMError / ToolError）
+  - 对照 opencode：`llm` 包的 `LLMError`、`Schema.TaggedError` 用法
+
+- **13.4 阶段验收**
+  - 验收：typecheck 通过、工具参数有运行时校验、错误可精确捕获
+  - 工程思维：Schema 的双重身份——"定义一次，类型 + 校验都有"
+
+#### 阶段产出
+
+```
+opencode-from-scratch/
+└── src/
+    ├── schema/               # Schema 定义（Message、ToolCall 等）
+    │   └── types.ts
+    ├── error/                # Typed errors
+    │   └── errors.ts
+    └── tool/                 # 工具参数解析改用 Schema 校验
+```
 
 
+### 阶段 14：Effect Stream（流式重写）
 
-### 阶段 11：Monorepo 拆分 + Schema 契约层
+> **目标**：把 chatWithTools 的流式输出从 ReadableStream 改成 Effect Stream，理解 Stream 的惰性拉取式异步序列和组合性。
+>
+> **为什么现在做**：当前流式输出用 ReadableStream 的 async iterator，能跑但不可组合。Effect Stream 提供丰富的组合子（map/filter/tap/runForEach/runFold），且与 Service/Layer 体系无缝衔接。这也是后续事件溯源（阶段 17）的基础——事件流本质就是 Stream。
+
+#### 课程
+
+- **14.1 Stream 基础：惰性拉取式异步序列**
+  - Stream 是什么（对照 Python async iterator，但组合子丰富）
+  - `Stream.fromIterable` / `Stream.map` / `Stream.runForEach` / `Stream.runFold` / `Stream.tap`
+  - Stream 的惰性：不拉取就不生产值
+
+- **14.2 用 Stream 重构 chatWithTools**
+  - 把 `chatWithTools` 的流式输出从 ReadableStream 改成 Effect Stream
+  - onChunk 回调用 `Stream.runForEach` 驱动；完整文本用 `Stream.runFold` 聚合
+  - Stream 的组合性：`stream.pipe(Stream.map(...), Stream.filter(...))` 链式组装
+  - 对照 opencode：`llm/src/protocols/shared.ts`（SSE 分帧的 Stream 组合子大全）、`llm/example/tutorial.ts`
+
+- **14.3 阶段验收**
+  - 验收：typecheck 通过、流式输出用 Effect Stream 驱动、CLI + TUI 都能跑
+  - 工程思维：Stream 的组合性——把"流处理"变成声明式链式变换，而非命令式 for 循环
+  - 预告：Stream 是后续事件溯源（阶段 17）的地基
+
+#### 阶段产出
+
+```
+opencode-from-scratch/
+└── src/
+    └── provider/openai.ts    # 重构：返回 Effect Stream
+```
+
+
+### 阶段 15：Monorepo 拆分 + Schema 契约层
 
 > **目标**：把单 package 拆成 Bun workspaces monorepo，先抽出 `schema` 包作为最底层的共享契约层。
 >
@@ -516,7 +614,7 @@ opencode-from-scratch/
 >
 > **产出**：`packages/{schema, opencode}` 两层结构，所有共享类型在 schema 包。
 
-### 阶段 12：Core 领域服务化
+### 阶段 16：Core 领域服务化
 
 > **目标**：把 session/provider/tool/database/filesystem 等领域逻辑重构成 Effect Service，搬进新建的 `core` 包。
 >
@@ -527,12 +625,12 @@ opencode-from-scratch/
 > - Filesystem 服务：封装文件读写、glob、grep
 > - Tool 注册表服务：工具的注册与查找
 > - SystemContext 服务：组装 system prompt
-> - Provider 服务：封装 LLM 调用（阶段 14 升级成 Route）
+> - Provider 服务：封装 LLM 调用（阶段 18 升级成 Route）
 > - 对照 opencode：`packages/core/src/` 的领域文件 + 同名子目录结构
 >
 > **产出**：`packages/{schema, core, opencode}` 三层结构，agent 通过 Context 取用 core 服务。
 
-### 阶段 13：Session 事件溯源
+### 阶段 17：Session 事件溯源
 
 > **目标**：把 session 持久化从"直接 CRUD"重构成"事件溯源 + 投影"--所有状态变化先写成 durable event，再由 projector 投影成可查询视图。
 >
@@ -549,7 +647,7 @@ opencode-from-scratch/
 >
 > **产出**：session 状态由事件流驱动，支持从事件重建、revert 回滚。
 
-### 阶段 14：LLM Route 四轴模型
+### 阶段 18：LLM Route 四轴模型
 
 > **目标**：把简单 Provider 接口升级成 Route 四轴模型（Protocol + Endpoint + Auth + Framing），抽出独立的 `llm` 包。
 >
@@ -566,7 +664,7 @@ opencode-from-scratch/
 >
 > **产出**：`packages/{schema, core, llm, opencode}` 四层，多厂商 protocol 复用。
 
-### 阶段 15：Server + Protocol + Client
+### 阶段 19：Server + Protocol + Client
 
 > **目标**：引入 HTTP server（Effect HttpApi + Hono）+ SSE 事件流 + 生成 client SDK，把 TUI 和 agent 拆成两个进程。
 >
@@ -583,11 +681,11 @@ opencode-from-scratch/
 >
 > **产出**：两进程架构，`bun run server` 跑 agent，TUI 通过 HTTP 连接。
 
-### 阶段 16：Permission 系统
+### 阶段 20：Permission 系统
 
 > **目标**：给工具执行加上权限检查--危险操作（写文件、跑命令）执行前询问用户确认。
 >
-> **为什么现在做**：当前工具能直接改文件、跑任意命令，没有任何确认环节。opencode 的 permission 系统在工具执行前检查规则（allow/ask/deny），可配置。配合阶段 17 的 agent 定义，不同 agent 有不同权限边界（build 全权限、plan 只读）。
+> **为什么现在做**：当前工具能直接改文件、跑任意命令，没有任何确认环节。opencode 的 permission 系统在工具执行前检查规则（allow/ask/deny），可配置。配合阶段 21 的 agent 定义，不同 agent 有不同权限边界（build 全权限、plan 只读）。
 >
 > **核心主题**：
 > - 权限规则定义与匹配（allow/ask/deny）
@@ -597,7 +695,7 @@ opencode-from-scratch/
 >
 > **产出**：工具执行前有权限流程，危险操作需确认。
 
-### 阶段 17：Agent 定义 + Subagent
+### 阶段 21：Agent 定义 + Subagent
 
 > **目标**：从单一 agent 扩展到多 agent 体系--build（全权限）、plan（只读）、general（子 agent），实现 task 工具委派子 session。
 >
@@ -612,7 +710,7 @@ opencode-from-scratch/
 >
 > **产出**：多 agent 切换，task 工具委派子 agent。
 
-### 阶段 18：更多工具
+### 阶段 22：更多工具
 
 > **目标**：补全 opencode 的完整工具集--todowrite、webfetch、websearch、question、skill、apply_patch。
 >
@@ -628,7 +726,7 @@ opencode-from-scratch/
 >
 > **产出**：完整工具集，agent 能力全面。
 
-### 阶段 19：MCP 支持
+### 阶段 23：MCP 支持
 
 > **目标**：集成 Model Context Protocol，让 agent 能接入外部 MCP server 扩展工具。
 >
@@ -643,7 +741,7 @@ opencode-from-scratch/
 >
 > **产出**：配置 MCP server 后，工具自动可用。
 
-### 阶段 20：Compaction + 高级特性
+### 阶段 24：Compaction + 高级特性
 
 > **目标**：实现长对话压缩（compaction）、会话回滚（revert）、插件系统（plugin）、LSP 诊断集成。
 >
@@ -658,11 +756,11 @@ opencode-from-scratch/
 >
 > **产出**：长对话可压缩、可回滚、可插件扩展、有 LSP 诊断。
 
-### 阶段 21：Web UI + Desktop
+### 阶段 25：Web UI + Desktop
 
 > **目标**：在 TUI 之外，增加 Web UI（SolidJS）和桌面应用（Electron），复用同一套 server + client。
 >
-> **为什么现在做**：阶段 15 的 server/client 架构让多端成为可能。opencode 有 `app`（SolidJS web）、`desktop`（Electron）、`ui`（共享组件库）、`session-ui`（共享会话渲染）。它们都连同一个 server，只是渲染层不同。
+> **为什么现在做**：阶段 19 的 server/client 架构让多端成为可能。opencode 有 `app`（SolidJS web）、`desktop`（Electron）、`ui`（共享组件库）、`session-ui`（共享会话渲染）。它们都连同一个 server，只是渲染层不同。
 >
 > **核心主题**：
 > - SolidJS Web UI：Vite + 组件
@@ -681,20 +779,24 @@ opencode-from-scratch/
 
 | 阶段 | 解决的痛点 | 引入的 opencode 抽象 |
 |------|-----------|---------------------|
-| 10 | 依赖到处传 | Effect Service/Layer/Stream/Schema |
-| 11 | 类型重复、边界模糊 | schema 契约层 + Bun workspaces |
-| 12 | 领域逻辑散乱 | core 领域服务化 |
-| 13 | 无法 revert/恢复/压缩 | Session 事件溯源 |
-| 14 | 加 provider 要复制粘贴 | LLM Route 四轴模型 |
-| 15 | TUI 与 agent 耦合 | Server + Protocol + Client |
-| 16 | 工具能乱改无确认 | Permission 系统 |
-| 17 | 单 agent 干所有事 | Agent 定义 + Subagent |
-| 18 | 工具不够用 | 完整工具集 |
-| 19 | 工具扩展要改源码 | MCP 支持 |
-| 20 | 长对话爆上下文 | Compaction + revert + plugin + LSP |
-| 21 | 只有 TUI | Web UI + Desktop |
+| 10 | 依赖到处传 | Effect 基础（延迟计算描述） |
+| 11 | 依赖到处传 | Service + Layer（依赖注入） |
+| 12 | 依赖到处传 | 用 Effect 重构 agent loop |
+| 13 | 类型校验缺失、错误模糊 | Schema + Typed Errors |
+| 14 | ReadableStream 不可组合 | Effect Stream |
+| 15 | 类型重复、边界模糊 | schema 契约层 + Bun workspaces |
+| 16 | 领域逻辑散乱 | core 领域服务化 |
+| 17 | 无法 revert/恢复/压缩 | Session 事件溯源 |
+| 18 | 加 provider 要复制粘贴 | LLM Route 四轴模型 |
+| 19 | TUI 与 agent 耦合 | Server + Protocol + Client |
+| 20 | 工具能乱改无确认 | Permission 系统 |
+| 21 | 单 agent 干所有事 | Agent 定义 + Subagent |
+| 22 | 工具不够用 | 完整工具集 |
+| 23 | 工具扩展要改源码 | MCP 支持 |
+| 24 | 长对话爆上下文 | Compaction + revert + plugin + LSP |
+| 25 | 只有 TUI | Web UI + Desktop |
 
-> **注意**：阶段 10-21 是路线图级规划，进入每个阶段前才细化具体课程内容（与阶段 0-9 一致的活文档原则）。顺序可能根据实际学习情况调整，但"动机驱动 + 渐进演进"的核心不变。
+> **注意**：阶段 10-25 是路线图级规划，进入每个阶段前才细化具体课程内容（与阶段 0-9 一致的活文档原则）。顺序可能根据实际学习情况调整，但"动机驱动 + 渐进演进"的核心不变。
 
 ## 当前状态
 
@@ -708,17 +810,21 @@ opencode-from-scratch/
 - [x] 阶段 7：System Context & AGENTS.md
 - [x] 阶段 8：CLI 入口
 - [x] 阶段 9：TUI 终端界面
-- [ ] 阶段 10：Effect-TS 入门（从痛点出发）
-- [ ] 阶段 11：Monorepo 拆分 + Schema 契约层
-- [ ] 阶段 12：Core 领域服务化
-- [ ] 阶段 13：Session 事件溯源
-- [ ] 阶段 14：LLM Route 四轴模型
-- [ ] 阶段 15：Server + Protocol + Client
-- [ ] 阶段 16：Permission 系统
-- [ ] 阶段 17：Agent 定义 + Subagent
-- [ ] 阶段 18：更多工具
-- [ ] 阶段 19：MCP 支持
-- [ ] 阶段 20：Compaction + 高级特性
-- [ ] 阶段 21：Web UI + Desktop
+- [ ] 阶段 10：Effect 基础（延迟的计算描述）
+- [ ] 阶段 11：Service + Layer（依赖注入）
+- [ ] 阶段 12：用 Effect 重构 agent loop
+- [ ] 阶段 13：Effect Schema + Typed Errors
+- [ ] 阶段 14：Effect Stream（流式重写）
+- [ ] 阶段 15：Monorepo 拆分 + Schema 契约层
+- [ ] 阶段 16：Core 领域服务化
+- [ ] 阶段 17：Session 事件溯源
+- [ ] 阶段 18：LLM Route 四轴模型
+- [ ] 阶段 19：Server + Protocol + Client
+- [ ] 阶段 20：Permission 系统
+- [ ] 阶段 21：Agent 定义 + Subagent
+- [ ] 阶段 22：更多工具
+- [ ] 阶段 23：MCP 支持
+- [ ] 阶段 24：Compaction + 高级特性
+- [ ] 阶段 25：Web UI + Desktop
 
-> **下一步**：开始阶段 10「Effect-TS 入门」-- 这是后续所有阶段的基础，opencode 的灵魂。进入前先细化具体课程内容。
+> **下一步**：进入阶段 10 前先细化具体课程内容。阶段 10-14 拆分自原阶段 10，将 Effect 的核心概念（基础/Schema/Stream/Service+Layer）拆成独立阶段，每个聚焦一个主题。
