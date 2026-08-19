@@ -133,6 +133,7 @@ const combined = Effect.gen(function* () {
   const x = yield* Effect.succeed(10)
 
   // 异步的 Effect（promise 桥接）
+  // readFile 是变量不是函数，它存的是 Effect.promise 返回的 Effect 盒子
   const modelName = yield* readFile // 读 opencode.json
 
   // 用 Fail 做校验

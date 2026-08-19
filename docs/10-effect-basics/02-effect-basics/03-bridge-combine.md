@@ -66,6 +66,7 @@ Effect.runSync(readFile)              // 报错！readFile 里有异步操作
 const combined = Effect.gen(function* () {
   const x = yield* Effect.succeed(10)       // 同步
   const modelName = yield* readFile          // 异步（读文件）
+  // readFile 是变量不是函数，存的是 Effect.promise 返回的 Effect
   return `${modelName} 结果是 ${x * 2}`
 })
 ```
