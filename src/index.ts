@@ -1,132 +1,49 @@
 // src/index.ts
-// 入口：CLI + 多轮对话 + 工具循环 + session 持久化
+// 阶段 12 教学代码：CLI 入口——用 Effect 组装 Layer，跑 agent loop
 // 跑法：
 //   bun run src/index.ts run              # 交互模式
-//   bun run src/index.ts run "你好"       # 非交互模式（发一条消息，退出）
+//   bun run src/index.ts run "你好"       # 非交互模式
 //   bun run src/index.ts run -c           # 恢复上次会话
 //   bun run src/index.ts run -s ses_xxx   # 恢复指定 session
+//
+// 重构前（阶段 9）：
+//   const config = await loadConfig()
+//   const provider = createOpenAIProvider(config)
+//   const tools = [readTool, writeTool, ...]
+//   await runToolLoop(messages, sessionId, provider, tools)
+//
+// 重构后（阶段 12）：
+//   provider 和 tools 从 Context 自取，只在入口组装一次 Layer
+//   runAgentLoop 签名变短：(messages, callbacks) 不再传 provider/tools
 
 import yargs from "yargs"
 import { hideBin } from "yargs/helpers"
+import { Effect, Layer } from "effect"
 import type { Message } from "./types"
-import { loadConfig } from "./llm"
-import { createOpenAIProvider } from "./provider/openai"
-import type { Provider } from "./provider"
-import { readTool } from "./tool/read"
-import { writeTool } from "./tool/write"
-import { editTool } from "./tool/edit"
-import { bashTool } from "./tool/bash"
-import { globTool } from "./tool/glob"
-import { grepTool } from "./tool/grep"
-import { truncate } from "./tool/truncate"
-import type { Tool } from "./tool/tool"
-import { createSession, listSessions, getSession } from "./session"
 import { saveMessage, loadMessages } from "./message"
 import { buildSystemPrompt } from "./system-context"
+import { createSession, listSessions, getSession } from "./session"
 import { debug, debugMessages } from "./debug"
+import { runAgentLoop } from "./agent-loop"
+import { configLayer } from "./service/config"
+import { providerLayer } from "./service/provider"
+import { toolRegistryLayer } from "./service/tool-registry"
 
-// ── 工具循环 ──────────────────────────────────────────────
-// agent 的核心：LLM 调用工具 → 执行 → 喂回结果 → 继续调 LLM → 直到不再调用工具
-// 对照 opencode: session/prompt.ts 的 runLoop
-async function runToolLoop(
-  messages: Message[],
-  sessionId: string,
-  provider: Provider,
-  tools: Tool[],
-): Promise<void> {
-  const MAX_STEPS = 20 // 防止无限循环
-
-  let step = 0
-  while (step < MAX_STEPS) {
-    step++
-    debug(`── Step ${step}/${MAX_STEPS} ──`)
-
-    // 调试：打印发给 LLM 的完整消息列表
-    debugMessages(messages)
-
-    process.stdout.write("AI: ")
-    const result = await provider.chatWithTools(messages, tools, (text) => {
-      process.stdout.write(text)
-    })
-    console.log()
-
-    // 调试：打印 LLM 返回的完整结果
-    debug("LLM 返回:", { text: result.text, toolCallsCount: result.toolCalls.length })
-    if (result.toolCalls.length > 0) {
-      debug("tool_calls:", result.toolCalls.map((tc) => `${tc.function.name}(${tc.function.arguments})`))
-    }
-
-    // 没有 tool_calls → LLM 说完了，结束循环
-    if (result.toolCalls.length === 0) {
-      const assistantMsg: Message = { role: "assistant", content: result.text }
-      messages.push(assistantMsg)
-      await saveMessage(sessionId, assistantMsg)
-      break
-    }
-
-    // 有 tool_calls → 把 assistant 消息（带 tool_calls）加入 messages
-    const assistantMsg: Message = {
-      role: "assistant",
-      content: result.text || null,
-      tool_calls: result.toolCalls,
-    }
-    messages.push(assistantMsg)
-    await saveMessage(sessionId, assistantMsg)
-
-    // 执行每个工具，把结果以 role: "tool" 加入 messages
-    for (const tc of result.toolCalls) {
-      const tool = tools.find((t) => t.id === tc.function.name)
-      if (!tool) {
-        console.log(`  [错误] 找不到工具: ${tc.function.name}`)
-        const errorMsg: Message = {
-          role: "tool",
-          tool_call_id: tc.id,
-          content: `错误：找不到工具 ${tc.function.name}`,
-        }
-        messages.push(errorMsg)
-        await saveMessage(sessionId, errorMsg)
-        continue
-      }
-
-      const args = JSON.parse(tc.function.arguments)
-      console.log(`  [调用工具] ${tc.function.name}(${tc.function.arguments})`)
-      const output = await tool.execute(args)
-
-      // 调试：打印工具的完整输出（未截断，和喂给 LLM 的可能不同）
-      debug(`工具 ${tc.function.name} 完整输出 (${output.length} 字符):`)
-      debug(output)
-
-      const toolMsg: Message = {
-        role: "tool",
-        tool_call_id: tc.id,
-        content: truncate(output),
-      }
-      messages.push(toolMsg)
-      await saveMessage(sessionId, toolMsg)
-    }
-  }
-
-  if (step >= MAX_STEPS) {
-    console.log("  [达到最大步数限制，停止循环]")
-  }
-}
+// ── Layer 组装 ──────────────────────────────────────────────
+// providerLayer 依赖 ConfigService，所以要先喂给它
+const satisfiedProvider = providerLayer.pipe(Layer.provide(configLayer))
+const appLayers = Layer.mergeAll(configLayer, satisfiedProvider, toolRegistryLayer)
 
 // ── CLI 定义 ──────────────────────────────────────────────
-// 对照 opencode: packages/opencode/src/index.ts
-// opencode 有 23 个命令，我们简化为 1 个 run 命令
 
 yargs(hideBin(process.argv))
   .scriptName("opencode-from-scratch")
-  // 全局选项：所有命令都能用 --debug
-  // 对照 opencode: src/index.ts 的 .option("print-logs", ...) 等
   .option("debug", {
     alias: "d",
     type: "boolean",
     description: "启用调试日志",
     global: true,
   })
-  // 中间件：在 handler 之前运行，做跨命令的通用处理
-  // 对照 opencode: src/index.ts 的 .middleware（选项转环境变量）
   .middleware(async (args) => {
     if (args.debug) {
       process.env.DEBUG = "1"
@@ -142,28 +59,22 @@ yargs(hideBin(process.argv))
         .option("continue", { alias: "c", type: "boolean", description: "恢复上次会话" })
         .option("session", { alias: "s", type: "string", description: "恢复指定 session ID" }),
     async (args) => {
-      // 1. 读配置 + 创建 Provider + 注册工具
-      const config = await loadConfig()
-      const provider: Provider = createOpenAIProvider(config)
-      const tools: Tool[] = [readTool, writeTool, editTool, bashTool, globTool, grepTool]
-
-      // 2. system prompt（不存数据库，每次启动重新生成）
+      // 1. system prompt（不存数据库，每次启动重新生成）
       const systemPrompt: Message = {
         role: "system",
         content: buildSystemPrompt(),
       }
 
-      // 3. 调试模式（VSCode Debug Console 不支持 stdin）
+      // 2. 调试模式（VSCode Debug Console 不支持 stdin）
       const debugInputs = process.env.DEBUG_INPUTS
         ? (JSON.parse(process.env.DEBUG_INPUTS) as string[])
         : null
 
-      // 4. 决定 session：--session > --continue > 新建/选择
+      // 3. 决定 session
       let sessionId: string
       let messages: Message[]
 
       if (args.session) {
-        // --session <id>：恢复指定 session
         const session = await getSession(args.session)
         if (!session) {
           console.log(`找不到 session: ${args.session}`)
@@ -174,7 +85,6 @@ yargs(hideBin(process.argv))
         messages = [systemPrompt, ...history]
         console.log(`已恢复会话: ${session.title} (${history.length} 条历史消息)`)
       } else if (args.continue) {
-        // --continue：恢复最近更新的 session
         const sessions = await listSessions()
         if (sessions.length === 0) {
           console.log("没有历史会话，新建一个")
@@ -182,27 +92,23 @@ yargs(hideBin(process.argv))
           sessionId = session.id
           messages = [systemPrompt]
         } else {
-          const latest = sessions[0]! // listSessions 按 time_updated 倒序
+          const latest = sessions[0]!
           sessionId = latest.id
           const history = await loadMessages(sessionId)
           messages = [systemPrompt, ...history]
           console.log(`已恢复会话: ${latest.title} (${history.length} 条历史消息)`)
         }
       } else if (debugInputs) {
-        // 调试模式：自动新建 session
         const session = await createSession()
         sessionId = session.id
         messages = [systemPrompt]
         console.log(`AI 助手已启动（调试模式）→ 新建会话: ${session.title}`)
       } else if (args.message && args.message.length > 0) {
-        // 非交互模式：有 message → 新建 session
         const session = await createSession()
         sessionId = session.id
         messages = [systemPrompt]
       } else {
-        // 交互模式：列出已有 session，让用户选
         const sessions = await listSessions()
-
         if (sessions.length > 0) {
           console.log("AI 助手已启动\n")
           console.log("已有会话：")
@@ -212,10 +118,8 @@ yargs(hideBin(process.argv))
             console.log(`  [${i}] ${s.title}  (${time})`)
           }
           console.log(`  [${sessions.length}] 新建会话`)
-
           const choice = prompt("\n请选择: ")
           const choiceNum = choice ? parseInt(choice) : NaN
-
           if (isNaN(choiceNum) || choiceNum === sessions.length) {
             const session = await createSession()
             sessionId = session.id
@@ -239,29 +143,52 @@ yargs(hideBin(process.argv))
         }
       }
 
-      // 5. 非交互模式：发一条消息，退出
+      // 4. 运行 agent loop 的辅助函数
+      // 注意：runAgentLoop 返回 Effect，需要 provide Layer 再 runPromise
+      async function runLoop(messages: Message[]): Promise<void> {
+        await Effect.runPromise(
+          runAgentLoop(messages, {
+            onChunk(text) {
+              process.stdout.write(text)
+            },
+            onToolCall(id, name, args) {
+              console.log(`\n  [调用工具] ${name}(${args})`)
+            },
+            onToolResult(_id, _output) {
+              // CLI 版不展示工具结果（太长了），只展示调用名
+            },
+            // CLI 版需要持久化，传 onMessage 回调
+            onMessage(msg) {
+              saveMessage(sessionId, msg)
+            },
+          }).pipe(Effect.provide(appLayers)),
+        )
+      }
+
+      // 5. 非交互模式
       if (args.message && args.message.length > 0) {
         const input = args.message.join(" ")
         const userMsg: Message = { role: "user", content: input }
         messages.push(userMsg)
         await saveMessage(sessionId, userMsg)
-        await runToolLoop(messages, sessionId, provider, tools)
+        process.stdout.write("AI: ")
+        await runLoop(messages)
+        console.log()
         return
       }
 
-      // 6. 交互模式：while 循环
+      // 6. 交互模式
       console.log("\n输入问题开始对话（Ctrl+C 退出）\n")
-
       let debugIndex = 0
       while (true) {
         const input = debugInputs ? debugInputs[debugIndex++] : prompt("你: ")
         if (!input) break
-
         const userMsg: Message = { role: "user", content: input }
         messages.push(userMsg)
         await saveMessage(sessionId, userMsg)
-
-        await runToolLoop(messages, sessionId, provider, tools)
+        process.stdout.write("AI: ")
+        await runLoop(messages)
+        console.log("\n")
       }
     },
   )
