@@ -19,6 +19,7 @@ import type { Message } from "./types"
 import { truncate } from "./tool/truncate"
 import { ProviderService } from "./service/provider"
 import { ToolRegistry } from "./service/tool-registry"
+import { ToolError } from "./error/errors"
 
 // 回调接口：调用方决定怎么处理事件
 export interface LoopCallbacks {
@@ -75,13 +76,16 @@ export const runAgentLoop = Effect.fn("runAgentLoop")(function* (
       const tool = toolList.find((t) => t.id === tc.function.name)
       callbacks.onToolCall(tc.id, tc.function.name, tc.function.arguments)
 
-      let output: string
+let output: string
       if (!tool) {
         output = `错误：找不到工具 ${tc.function.name}`
       } else {
-        const args = JSON.parse(tc.function.arguments)
-        // 工具执行也是 Promise，同样桥接
-        output = yield* Effect.promise(() => tool.execute(args))
+        try {
+          const args = JSON.parse(tc.function.arguments)
+          output = yield* Effect.promise(() => tool.execute(args))
+        } catch (e) {
+          output = `工具参数解析失败: ${e instanceof Error ? e.message : String(e)}`
+        }
       }
       callbacks.onToolResult(tc.id, output)
 

@@ -14,6 +14,7 @@
 // ConfigService.of（Context.Service 自动给类加的静态方法，用来包装实现）
 
 import { Context, Effect, Layer } from "effect"
+import { ConfigError } from "../error/errors"
 
 // Config 的形状：和之前 loadConfig() 返回的一致
 export interface Config {
@@ -58,7 +59,7 @@ export const configLayer = Layer.effect(
     const provider = raw.provider[providerID]
 
     if (!provider) {
-      return yield* Effect.fail(new Error(`配置文件里找不到 provider: ${providerID}`))
+      return yield* Effect.fail(new ConfigError({ message: `配置文件里找不到 provider: ${providerID}` }))
     }
 
     const config: Config = {
