@@ -1,23 +1,19 @@
 // src/tool/glob.ts
 // glob 工具：按文件名模式匹配文件
 // 对照 opencode: packages/opencode/src/tool/glob.ts（opencode 底层用 fast-glob 包）
+//
+// 阶段 13 改动：参数定义从手写 JSON Schema 改为 Effect Schema（单一来源）
 
-import type { Tool, JSONSchema } from "./tool"
+import { Schema } from "effect"
+import type { Tool } from "./tool"
 import DESCRIPTION from "./glob.txt"
 
-const parameters: JSONSchema = {
-  type: "object",
-  properties: {
-    pattern: {
-      type: "string",
-      description: "glob 模式（如 **/*.ts）",
-    },
-  },
-  required: ["pattern"],
-}
+export const Parameters = Schema.Struct({
+  pattern: Schema.String.annotate({ description: "glob 模式（如 **/*.ts）" }),
+})
 
-async function execute(args: Record<string, unknown>): Promise<string> {
-  const pattern = args.pattern as string
+async function execute(args: Schema.Schema.Type<typeof Parameters>): Promise<string> {
+  const { pattern } = args
 
   // Bun.Glob：内置的文件模式匹配
   // 类比 Python: glob.glob(pattern, recursive=True)
@@ -35,9 +31,9 @@ async function execute(args: Record<string, unknown>): Promise<string> {
   return paths.join("\n")
 }
 
-export const globTool: Tool = {
+export const globTool: Tool<typeof Parameters> = {
   id: "glob",
   description: DESCRIPTION,
-  parameters,
+  parameters: Parameters,
   execute,
 }

@@ -2,23 +2,19 @@
 // bash 工具：执行 shell 命令
 // 对照 opencode: packages/opencode/src/tool/shell.ts
 // opencode 的 shell 工具支持 PTY、权限检查、流式输出、语法高亮等，我们用最简版
+//
+// 阶段 13 改动：参数定义从手写 JSON Schema 改为 Effect Schema（单一来源）
 
-import type { Tool, JSONSchema } from "./tool"
+import { Schema } from "effect"
+import type { Tool } from "./tool"
 import DESCRIPTION from "./bash.txt"
 
-const parameters: JSONSchema = {
-  type: "object",
-  properties: {
-    command: {
-      type: "string",
-      description: "要执行的 shell 命令",
-    },
-  },
-  required: ["command"],
-}
+export const Parameters = Schema.Struct({
+  command: Schema.String.annotate({ description: "要执行的 shell 命令" }),
+})
 
-async function execute(args: Record<string, unknown>): Promise<string> {
-  const command = args.command as string
+async function execute(args: Schema.Schema.Type<typeof Parameters>): Promise<string> {
+  const { command } = args
 
   // 跨平台 shell 选择
   // 对照 opencode: packages/core/src/shell.ts 的 win() 函数
@@ -62,9 +58,9 @@ async function execute(args: Record<string, unknown>): Promise<string> {
   return output || "[无输出]"
 }
 
-export const bashTool: Tool = {
+export const bashTool: Tool<typeof Parameters> = {
   id: "bash",
   description: DESCRIPTION,
-  parameters,
+  parameters: Parameters,
   execute,
 }

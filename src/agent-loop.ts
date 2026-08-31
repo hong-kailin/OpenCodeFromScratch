@@ -13,8 +13,13 @@
 // 同时合并了 CLI 版 runToolLoop 和 TUI 版 runAgentLoop：
 // - 原来两个 loop 逻辑几乎一样，唯一区别是 CLI 版有 saveMessage 持久化
 // - 现在用 onMessage 回调承载差异：CLI 传 saveMessage，TUI 不传
+//
+// 阶段 13 改动：工具参数解析从"裸 JSON.parse"升级为"Schema 校验"
+//   const args = JSON.parse(tc.function.arguments)  // 之前：无校验，类型是 any
+//   Schema.decodeUnknownEffect(tool.parameters)(raw) // 现在：运行期校验，失败抛错误
+// 校验失败的错误会作为工具结果喂回给 LLM（让它重新调用），而不是中断 loop
 
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
 import type { Message } from "./types"
 import { truncate } from "./tool/truncate"
 import { ProviderService } from "./service/provider"
@@ -76,16 +81,46 @@ export const runAgentLoop = Effect.fn("runAgentLoop")(function* (
       const tool = toolList.find((t) => t.id === tc.function.name)
       callbacks.onToolCall(tc.id, tc.function.name, tc.function.arguments)
 
-let output: string
+      let output: string
       if (!tool) {
         output = `错误：找不到工具 ${tc.function.name}`
       } else {
-        try {
-          const args = JSON.parse(tc.function.arguments)
-          output = yield* Effect.promise(() => tool.execute(args))
-        } catch (e) {
-          output = `工具参数解析失败: ${e instanceof Error ? e.message : String(e)}`
-        }
+        // 阶段 13：用 Schema 校验工具参数，替换裸 JSON.parse
+        // 流程（对照 opencode llm/tool-runtime.ts 的 decodeAndExecute）：
+        //   1. JSON.parse      —— LLM 返回的 arguments 是 JSON 字符串，解析成对象
+        //   2. Schema.decodeUnknownEffect —— 用工具的 Schema 校验参数结构
+        //      参数对 → 返回类型安全的 args；参数错 → Effect 失败（mapError 成 ToolError）
+        //   3. Effect.catch  —— 把解析/校验/执行任何失败转成错误文本
+        // 最终 output 一定是字符串：成功是工具结果，失败是错误说明，
+        // 两者都会作为 tool 消息喂回给 LLM（让它在下一步自纠正）——这正是 opencode
+        // "InvalidArgumentsError 的错误文本会作为工具结果返回给模型"的设计。
+        //
+        // 注意：mapError 要包在 Schema 解码这一段，而不是整个链上。
+        // 如果包在整个链上，JSON.parse 阶段的 ToolError 也会被 mapError 再包装一次，
+        // 导致错误文本冗余（"校验失败: ToolError: 不是合法 JSON"）。
+        const decodeAndRun = (rawArgs: unknown) =>
+          Schema.decodeUnknownEffect(tool.parameters)(rawArgs).pipe(
+            // Schema 校验失败：转成带 tag 的 ToolError
+            Effect.mapError(
+              (e) => new ToolError({ message: `工具 ${tool.id} 参数校验失败: ${String(e)}`, toolName: tool.id }),
+            ),
+            // 校验通过：args 类型安全，执行工具
+            Effect.flatMap((args) => Effect.promise(() => tool.execute(args))),
+          )
+
+        const runTool = Effect.try({
+          try: () => JSON.parse(tc.function.arguments),
+          catch: (e) =>
+            new ToolError({
+              message: `工具 ${tool.id} 参数不是合法 JSON: ${e instanceof Error ? e.message : String(e)}`,
+              toolName: tool.id,
+            }),
+        }).pipe(
+          Effect.flatMap(decodeAndRun),
+          // 兜底：任何失败（ToolError / execute 抛错）都转成错误文本，不中断 loop
+          Effect.catch((e) => Effect.succeed(e instanceof Error ? e.message : String(e))),
+        )
+        output = yield* runTool
       }
       callbacks.onToolResult(tc.id, output)
 

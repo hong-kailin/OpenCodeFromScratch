@@ -1,28 +1,24 @@
 // src/tool/grep.ts
 // grep 工具：按正则表达式搜索文件内容
 // 对照 opencode: packages/opencode/src/tool/grep.ts（opencode 底层用 ripgrep）
+//
+// 阶段 13 改动：参数定义从手写 JSON Schema 改为 Effect Schema（单一来源）
+// include 是可选字段，用 Schema.optional
 
-import type { Tool, JSONSchema } from "./tool"
+import { Schema } from "effect"
+import type { Tool } from "./tool"
 import DESCRIPTION from "./grep.txt"
 
-const parameters: JSONSchema = {
-  type: "object",
-  properties: {
-    pattern: {
-      type: "string",
-      description: "正则表达式",
-    },
-    include: {
-      type: "string",
-      description: "文件过滤模式（如 *.ts），默认搜索所有文件",
-    },
-  },
-  required: ["pattern"],
-}
+export const Parameters = Schema.Struct({
+  pattern: Schema.String.annotate({ description: "正则表达式" }),
+  include: Schema.optional(Schema.String).annotate({
+    description: "文件过滤模式（如 *.ts），默认搜索所有文件",
+  }),
+})
 
-async function execute(args: Record<string, unknown>): Promise<string> {
-  const pattern = args.pattern as string
-  const include = (args.include as string) || "**/*"
+async function execute(args: Schema.Schema.Type<typeof Parameters>): Promise<string> {
+  const { pattern } = args
+  const include = args.include || "**/*"
 
   // 编译正则表达式（i 表示不区分大小写）
   // 类比 Python: re.compile(pattern, re.IGNORECASE)
@@ -59,9 +55,9 @@ async function execute(args: Record<string, unknown>): Promise<string> {
   return results.join("\n")
 }
 
-export const grepTool: Tool = {
+export const grepTool: Tool<typeof Parameters> = {
   id: "grep",
   description: DESCRIPTION,
-  parameters,
+  parameters: Parameters,
   execute,
 }

@@ -74,7 +74,22 @@ program.pipe(
 - `LLMError`：LLM 调用错误
 - `ToolError`：工具执行错误
 
-`src/agent-loop.ts` 已导入 `ToolError`，后续可以精确捕获工具错误。
+**落地**（阶段 13）：`src/agent-loop.ts` 在 Schema 校验工具参数失败时，用 `mapError` 把
+`SchemaError` 转成 `ToolError`（带 tag 的类型化错误 + toolName 字段）：
+
+```typescript
+Schema.decodeUnknownEffect(tool.parameters)(rawArgs).pipe(
+  // SchemaError → ToolError，错误可被精确匹配
+  Effect.mapError((e) =>
+    new ToolError({ message: `工具 ${tool.id} 参数校验失败: ${String(e)}`, toolName: tool.id }),
+  ),
+  Effect.flatMap((args) => Effect.promise(() => tool.execute(args))),
+)
+```
+
+为什么用 `mapError` 而非 `catchTag`：这里**没有**两个错误类型需要区分——只有一个
+`SchemaError` 要转成 `ToolError`，`mapError`（把错误映射成另一个类型）更贴切。
+如果将来有多种错误需要分别处理（比如 `ConfigError` 和 `LLMError`），才用 `catchTag`。
 
 ## 跑一下
 

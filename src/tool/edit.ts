@@ -2,38 +2,27 @@
 // edit 工具：精确字符串替换
 // 对照 opencode: packages/opencode/src/tool/edit.ts
 // opencode 的 edit 也是精确匹配 + 多处报错 + replaceAll 选项
+//
+// 阶段 13 改动：参数定义从手写 JSON Schema 改为 Effect Schema（单一来源）
+// 注意 Schema.optional：可选字段，execute 里类型是 boolean | null | undefined
 
-import type { Tool, JSONSchema } from "./tool"
+import { Schema } from "effect"
+import type { Tool } from "./tool"
 import DESCRIPTION from "./edit.txt"
 
-const parameters: JSONSchema = {
-  type: "object",
-  properties: {
-    filePath: {
-      type: "string",
-      description: "文件路径",
-    },
-    oldString: {
-      type: "string",
-      description: "要替换的原文（必须精确匹配，包括空格和换行）",
-    },
-    newString: {
-      type: "string",
-      description: "替换后的新文本",
-    },
-    replaceAll: {
-      type: "boolean",
-      description: "是否替换所有匹配（默认 false，只替换第一个）",
-    },
-  },
-  required: ["filePath", "oldString", "newString"],
-}
+export const Parameters = Schema.Struct({
+  filePath: Schema.String.annotate({ description: "文件路径" }),
+  oldString: Schema.String.annotate({
+    description: "要替换的原文（必须精确匹配，包括空格和换行）",
+  }),
+  newString: Schema.String.annotate({ description: "替换后的新文本" }),
+  replaceAll: Schema.optional(Schema.Boolean).annotate({
+    description: "是否替换所有匹配（默认 false，只替换第一个）",
+  }),
+})
 
-async function execute(args: Record<string, unknown>): Promise<string> {
-  const filePath = args.filePath as string
-  const oldString = args.oldString as string
-  const newString = args.newString as string
-  const replaceAll = args.replaceAll as boolean | undefined
+async function execute(args: Schema.Schema.Type<typeof Parameters>): Promise<string> {
+  const { filePath, oldString, newString, replaceAll } = args
 
   // 1. 读文件
   const file = Bun.file(filePath)
@@ -72,9 +61,9 @@ async function execute(args: Record<string, unknown>): Promise<string> {
   return `已编辑 ${filePath}`
 }
 
-export const editTool: Tool = {
+export const editTool: Tool<typeof Parameters> = {
   id: "edit",
   description: DESCRIPTION,
-  parameters,
+  parameters: Parameters,
   execute,
 }
