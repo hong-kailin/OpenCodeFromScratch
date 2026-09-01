@@ -1,4 +1,4 @@
-# 13.2 用 Schema 校验工具参数
+# 13.3 用 Schema 校验工具参数
 
 > 对照代码：`src/schema-demo.ts` 第 3 节（演示）、`src/tool/*.ts` + `src/agent-loop.ts`（实际落地）
 

@@ -1,4 +1,4 @@
-# 13.2.3 agent-loop 参数校验：错误喂回，而不是中断
+# 13.3.3 agent-loop 参数校验：错误喂回，而不是中断
 
 > 对照代码：`src/agent-loop-validation-demo.ts`（可运行的完整演示）、`src/agent-loop.ts`（实际落地）
 

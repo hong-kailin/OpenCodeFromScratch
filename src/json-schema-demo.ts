@@ -1,5 +1,5 @@
 // src/json-schema-demo.ts
-// 阶段 13.2 教学代码：toJSONSchema 到底在做什么
+// 阶段 13.3 教学代码：toJSONSchema 到底在做什么
 // 跑法：bun run src/json-schema-demo.ts
 //
 // 解决一个问题：工具参数有三份信息（类型 / 校验器 / 给 LLM 的 JSON Schema），

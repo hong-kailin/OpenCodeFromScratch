@@ -1,4 +1,4 @@
-# 13.2.2 `toJSONSchema`：一份定义，三种用途自动派生
+# 13.3.2 `toJSONSchema`：一份定义，三种用途自动派生
 
 > 对照代码：`src/json-schema-demo.ts`（可运行的完整演示）
 

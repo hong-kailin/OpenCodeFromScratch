@@ -539,16 +539,16 @@ opencode-from-scratch/
   - `Schema.decodeUnknown(Schema)(input)`：解析 + 校验，失败返回 typed error
   - Schema 的双重身份：编译期是 TS 类型，运行期是校验器
 
-- **13.2 用 Schema 校验工具参数**
-  - 动手：把 `JSON.parse(tc.function.arguments)` 换成 Schema 校验
-  - 把 `Message` 类型用 Schema 重写（既当类型又当校验器）
-  - 对照 opencode：`packages/schema/src/` 的领域 schema
-
-- **13.3 Typed Errors：精确捕获**
+- **13.2 Typed Errors：精确捕获**
   - `Schema.TaggedError` / `Data.TaggedError`：带 tag 的类型化错误（对照 Python 的自定义异常类）
   - `Effect.catchTag("TagName", ...)` / `Effect.catchAll`：精确捕获
   - 动手：把 `throw new Error("字符串")` 换成 typed error（ConfigError / LLMError / ToolError）
   - 对照 opencode：`llm` 包的 `LLMError`、`Schema.TaggedError` 用法
+
+- **13.3 用 Schema 校验工具参数**
+  - 动手：把 `JSON.parse(tc.function.arguments)` 换成 Schema 校验
+  - 把 `Message` 类型用 Schema 重写（既当类型又当校验器）
+  - 对照 opencode：`packages/schema/src/` 的领域 schema
 
 - **13.4 阶段验收**
   - 验收：typecheck 通过、工具参数有运行时校验、错误可精确捕获

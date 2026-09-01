@@ -1,5 +1,5 @@
 // src/agent-loop-validation-demo.ts
-// 阶段 13.2 教学代码：agent-loop 里的参数校验 + 错误喂回
+// 阶段 13.3 教学代码：agent-loop 里的参数校验 + 错误喂回
 // 跑法：bun run src/agent-loop-validation-demo.ts
 //
 // 解决的问题：agent-loop 执行工具前要校验 LLM 传的参数。

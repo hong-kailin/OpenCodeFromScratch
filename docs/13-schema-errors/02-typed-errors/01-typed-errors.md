@@ -1,4 +1,4 @@
-# 13.3 Typed Errors：精确捕获
+# 13.2 Typed Errors：精确捕获
 
 > 对照代码：`src/schema-demo.ts` 第 4-5 节、`src/error/errors.ts`
 
