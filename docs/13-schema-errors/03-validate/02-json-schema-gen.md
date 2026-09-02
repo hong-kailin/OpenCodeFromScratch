@@ -1,6 +1,7 @@
 # 13.3.2 `toJSONSchema`：一份定义，三种用途自动派生
 
-> 对照代码：`src/json-schema-demo.ts`（可运行的完整演示）
+> 对照代码：`src/tool/tool.ts`（`toJSONSchema` 的实际实现）
+> 教学 demo `src/json-schema-demo.ts` 已清理，可通过 git 历史查看
 
 上一课我们在 `01-validate.md` 里看到这段代码，跨度很大看不懂：
 
@@ -134,7 +135,7 @@ JSON Schema 是白送的。effect 的 `toJsonSchemaDocument` 干的就是同样�
 "replaceAll": { "type": "boolean" }   // 可选字段：不列进 required 就够了
 ```
 
-`normalize` 就是干这个的。清洗规则三条：
+`normalize` 就是干这个的。清洗规则（见 `src/tool/tool.ts` 的 normalize）：
 
 ```
 1. anyOf 里去掉 null 分支
@@ -142,8 +143,8 @@ JSON Schema 是白送的。effect 的 `toJsonSchemaDocument` 干的就是同样�
 3. 嵌套的 anyOf 递归处理
 ```
 
-跑 `src/json-schema-demo.ts` 第 3 节，能直接看到清洗前（`anyOf: [boolean, null]`）和
-清洗后（`{ type: "boolean" }`）的对比，而且 description 也保住了。
+清洗前（`anyOf: [boolean, null]`）和清洗后（`{ type: "boolean" }`）的对比，
+可以在 `src/tool/tool.ts` 的 normalize 注释里看到，description 也保住了。
 
 ## 4. 串起来看这个函数做了什么
 
@@ -189,12 +190,6 @@ LLM 偶尔多塞一个字段进去，不至于校验失败。宽容一点，换�
 
 ## 跑一下
 
-```bash
-bun run src/json-schema-demo.ts
-```
-
-四节输出：
-1. 之前手写的 JSON Schema（read）
-2. `Schema.toJsonSchemaDocument` 的输出（一模一样，但自动生成）
-3. 清洗前 vs 清洗后（replaceAll 的 anyOf 噪音没了）
-4. 一份定义三种用途的总结
+教学 demo 已清理，可通过 git 历史查看。实际代码：`src/tool/tool.ts` 的
+`toJSONSchema()`（含 normalize）。想让某个工具出 JSON Schema，直接跑
+`bun run src/index.ts` 让 agent 调该工具，`--debug` 模式能看到发给 LLM 的 JSON Schema。

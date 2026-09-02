@@ -1,6 +1,7 @@
 # 13.3.3 agent-loop 参数校验：错误喂回，而不是中断
 
-> 对照代码：`src/agent-loop-validation-demo.ts`（可运行的完整演示）、`src/agent-loop.ts`（实际落地）
+> 对照代码：`src/agent-loop.ts`（实际落地）
+> 教学 demo `src/agent-loop-validation-demo.ts` 已清理，可通过 git 历史查看
 
 上一课我们在 `01-validate.md` 里看到这段代码，看不懂很正常——它一口气用了
 `.pipe()`、`mapError`、`flatMap`、`Effect.promise`、`Effect.try`、`Effect.catch`
@@ -174,16 +175,7 @@ opencode 源码里的原话（`opencode/packages/opencode/src/tool/tool.ts`）�
 
 翻译：这是"重写输入"的工具错误——错误文本会被当作工具结果喂回给模型。
 
-我们的 `runTool` 保证了这一点：
-
-```typescript
-// 无论成功失败，output 一定是一个字符串
-let output: string
-...
-output = yield* runTool   // runTool 内部的 catch 兜底，绝不抛出去
-```
-
-跑 `src/agent-loop-validation-demo.ts` 能看到完整过程：
+我们的 `runTool` 保证了这一点（完整流程示意）：
 
 ```
 第 1 轮：LLM 调用 read({"filePath": 123})          ← 犯错了
@@ -250,8 +242,5 @@ def run_tool(arguments_json: str) -> str:
 
 ## 跑一下
 
-```bash
-bun run src/agent-loop-validation-demo.ts
-```
-
-观察：第 1 轮失败 → 第 2 轮成功；坏 JSON 在哪一层报错。
+教学 demo 已清理，可通过 git 历史查看。实际验证：`src/agent-loop.ts` 里
+`runTool` 的完整实现，以及上文的流程示意（第 1 轮失败 → 第 2 轮成功）。

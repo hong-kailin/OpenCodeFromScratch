@@ -1,6 +1,7 @@
 # 13.2 Typed Errors：精确捕获
 
-> 对照代码：`src/schema-demo.ts` 第 4-5 节、`src/error/errors.ts`
+> 对照代码：`src/error/errors.ts`
+> 教学 demo `src/schema-demo.ts` 已清理，可通过 git 历史查看
 
 ## 当前问题：裸 Error
 
@@ -93,8 +94,5 @@ Schema.decodeUnknownEffect(tool.parameters)(rawArgs).pipe(
 
 ## 跑一下
 
-```bash
-bun run src/schema-demo.ts
-```
-
-看第 4-5 节：catchTag 精确捕获，catch 兜底。
+教学 demo 已清理，可通过 git 历史查看。实际落地：`src/error/errors.ts`
+（ConfigError / LLMError / ToolError）+ `src/agent-loop.ts`（`mapError` 转 ToolError）。

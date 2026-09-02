@@ -1,6 +1,6 @@
 # 13.1 Schema 基础：声明式数据契约
 
-> 对照代码：`src/schema-demo.ts` 第 1-2 节
+> 教学 demo `src/schema-demo.ts` 已清理，可通过 git 历史查看（本课正文的代码片段即演示内容）
 
 ## 当前问题：裸 JSON.parse
 
@@ -65,8 +65,5 @@ Schema.decodeUnknownSync(UserSchema)({ name: "Bob", age: "三十" })
 
 ## 跑一下
 
-```bash
-bun run src/schema-demo.ts
-```
-
-看第 1-2 节的输出。
+教学 demo 已清理，可通过 git 历史查看。想看实际用法，13.3 课落地到
+`src/tool/*.ts`（Effect Schema 定义工具参数）和 `src/agent-loop.ts`（运行期校验）。

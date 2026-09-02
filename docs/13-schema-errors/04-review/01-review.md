@@ -13,11 +13,11 @@
 ## 验证方式
 
 ```bash
-bun run src/schema-demo.ts     # 演示：Schema + TypedError 概念
 bun run typecheck              # 类型检查：Tool 泛型、Schema 推导全通过
 ```
 
-预期输出 5 个节：Schema 基础、双重身份、工具参数校验、精确捕获、兜底捕获。
+阶段 13 的教学 demo（`schema-demo.ts` 等）已清理，可通过 git 历史查看。
+实际落地验证：让 agent 调 read 工具传错误参数，校验失败信息会作为工具结果返回。
 
 ## 工程思维
 
@@ -47,7 +47,6 @@ agent loop 里工具参数校验失败，不应该中断整个对话，而应该
 src/
 ├── error/
 │   └── errors.ts           # ConfigError / LLMError / ToolError
-├── schema-demo.ts          # Schema + TypedError 演示
 ├── tool/
 │   ├── tool.ts             # Tool 泛型接口 + toJSONSchema（单一来源）
 │   └── read.ts 等 6 个工具   # Effect Schema 定义参数

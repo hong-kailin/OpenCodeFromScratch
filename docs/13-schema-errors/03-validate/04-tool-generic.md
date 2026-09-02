@@ -1,6 +1,7 @@
 # 13.3.4 泛型 Tool 接口：类型安全从哪来
 
-> 对照代码：`src/tool-generic-demo.ts`（可运行的完整演示）、`src/tool/tool.ts`（实际代码）
+> 对照代码：`src/tool/tool.ts`（实际代码）
+> 教学 demo `src/tool-generic-demo.ts` 已清理，可通过 git 历史查看
 
 阶段 13 的 Tool 接口和阶段 3 的旧版长得不一样了。旧版是：
 
@@ -164,17 +165,7 @@ export const readTool: Tool<typeof Parameters> = { parameters: Parameters, execu
 
 ## 跑一下
 
-```bash
-bun run src/tool-generic-demo.ts
-```
-
-四节输出：
-1. 泛型签名逐词拆解（注释）
-2. 类型推导：read 的 execute 参数类型安全
-3. 对比旧版 Record：编译期零保护 vs 泛型报错
-4. 泛型区分不同工具的 execute 参数（read / write）
-
-再加一步验证类型保护：
+教学 demo 已清理，可通过 git 历史查看。验证类型保护（不依赖 demo，用实际代码）：
 
 ```bash
 # 在 src/ 下建一个临时文件
