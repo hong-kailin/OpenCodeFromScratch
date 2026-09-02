@@ -576,15 +576,25 @@ opencode-from-scratch/
 #### 课程
 
 - **14.1 Stream 基础：惰性拉取式异步序列**
-  - Stream 是什么（对照 Python async iterator，但组合子丰富）
-  - `Stream.fromIterable` / `Stream.map` / `Stream.runForEach` / `Stream.runFold` / `Stream.tap`
-  - Stream 的惰性：不拉取就不生产值
+  - Stream 是什么：值的异步序列（对照 Python async generator，但组合子丰富）
+  - 创建：`Stream.fromIterable`（数组 → Stream）、`Stream.fromAsyncIterable`（异步可迭代对象 → Stream，正好接 `response.body`）
+  - 变换：`Stream.map` / `Stream.filter` / `Stream.tap`（副作用）/ `Stream.flatMap`（展开嵌套流）
+  - 消费：`Stream.runForEach`（对每个元素做副作用，是"点火"）、`Stream.runFold`（聚合整个流）
+  - Stream 的惰性：不消费就不生产值（和 Effect 一样，创建时不执行，消费时才执行）
+  - 教 debug：Stream 不输出/卡住时怎么排查（是不是忘了 runForEach、onError 回调）
+  - 产出：教学 demo `src/stream-demo.ts`
 
 - **14.2 用 Stream 重构 chatWithTools**
-  - 把 `chatWithTools` 的流式输出从 ReadableStream 改成 Effect Stream
-  - onChunk 回调用 `Stream.runForEach` 驱动；完整文本用 `Stream.runFold` 聚合
-  - Stream 的组合性：`stream.pipe(Stream.map(...), Stream.filter(...))` 链式组装
+  - 重构前：`src/provider/openai.ts` 的两层命令式 `for await` 循环（字节→文本→行→data 前缀→JSON），逻辑混在一起不可组合
+  - 重构后：一条 Stream 管线，每步只做一件事：
+    ```
+    字节流(fromAsyncIterable) → 解码(map) → 按行展开(flatMap) → 过滤data行(filter)
+      → 去前缀(map) → 去[DONE](filter) → JSON.parse(map)
+    ```
+  - onChunk 回调用 `Stream.runForEach` 驱动；完整文本/工具调用用闭包变量累积
+  - 对比：命令式 for 循环 vs 声明式 Stream 管线——"遍历"由谁驱动
   - 对照 opencode：`llm/src/protocols/shared.ts`（SSE 分帧的 Stream 组合子大全）、`llm/example/tutorial.ts`
+  - 产出：`src/provider/openai.ts` 重构（对外接口不变，agent-loop/CLI/TUI 不用动）
 
 - **14.3 阶段验收**
   - 验收：typecheck 通过、流式输出用 Effect Stream 驱动、CLI + TUI 都能跑
