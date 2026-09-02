@@ -2,6 +2,14 @@
 
 > 对照代码：`src/schema-demo.ts` 第 3 节（演示）、`src/tool/*.ts` + `src/agent-loop.ts`（实际落地）
 
+本课配套的详细拆解（看不懂主文档的某段就去对应小节）：
+
+| 文档 | 讲什么 | 配套 demo |
+|------|--------|-----------|
+| [02-json-schema-gen.md](./02-json-schema-gen.md) | `toJSONSchema`：一份 Schema 自动生成给 LLM 的 JSON Schema | `src/json-schema-demo.ts` |
+| [03-agent-loop-validation.md](./03-agent-loop-validation.md) | agent-loop 里参数校验 + 错误喂回设计 | `src/agent-loop-validation-demo.ts` |
+| [04-tool-generic.md](./04-tool-generic.md) | 泛型 `Tool<Parameters>` 接口：类型安全从哪来 | `src/tool-generic-demo.ts` |
+
 ## 真实场景
 
 每个工具的参数格式不同。LLM 返回的 `arguments` 是 JSON 字符串，需要解析 + 校验。
