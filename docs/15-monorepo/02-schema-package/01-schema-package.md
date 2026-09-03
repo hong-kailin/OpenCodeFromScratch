@@ -1,130 +1,174 @@
-# 15.2 Schema 契约层：把共享类型搬到 schema 包
+# 15.2 第 2 步：建 schema 契约层
 
-> 对照代码：`packages/schema/src/types.ts`、`packages/schema/src/index.ts`
+> 对照代码：`packages/schema/package.json`、`packages/schema/src/types.ts`、`packages/schema/src/index.ts`
 
-## 任务：把类型从 src/types.ts 搬进 schema 包
+## 这一步做什么
 
-阶段 15.1 搭好了 monorepo 骨架（workspaces + paths）。现在把共享类型搬进去，
-并用 Effect Schema 重写。
+创建 `packages/schema` 包：把 5 个共享类型搬进来，用 Effect Schema 重写，
+并配好包的导出（package.json + index.ts）。
 
-**之前**（`src/types.ts`）：interface 定义，只有编译期类型。
-**现在**（`packages/schema/src/types.ts`）：Effect Schema 定义，双重身份。
+## 为什么类型要搬进"契约层"
 
-## 搬什么：5 个类型
+回顾单 package 时代的痛点（00-overview 提到）：
+- `src/types.ts` 定义 ToolCall/Message 等共享类型
+- 但 `service/config.ts` 里又**重复定义**了一个本地 `interface Config`——同名不同义
+- 类型散落，没有统一归属
 
-| 类型 | 说明 | 从哪来 |
-|------|------|--------|
-| `ToolCall` | LLM 返回的工具调用 | `src/types.ts` |
-| `Message` | 一条对话消息 | `src/types.ts` |
-| `ProviderConfig` | 配置文件的 provider 结构 | `src/types.ts` |
-| `Config` | 配置文件结构 | `src/types.ts` |
-| `ResolvedConfig` | 解析后的运行配置（baseURL/apiKey/modelID） | `src/service/config.ts`（原本是本地重复定义） |
+契约层的价值：**一份定义，多方共享**。Message 只定义一次，CLI、TUI、agent-loop
+都用它；改类型只动 schema 包，上层知道去哪里找。
 
-注意最后一行：`ResolvedConfig` 之前定义在 `service/config.ts` 里（本地 `interface Config`），
-和 `src/types.ts` 的 `Config` **不是同一个东西**——一个叫 Config 但含义不同，这正是
-"类型重复定义、边界模糊"的实例。现在统一收进 schema 包，命名区分清楚。
+## 操作 1：写 packages/schema/package.json
 
-## Effect Schema 重写：双重身份
+```jsonc
+// packages/schema/package.json
+{
+  "name": "@opencode-from-scratch/schema",  // 包名（@scope/name 格式）
+  "private": true,                          // 不发布到 npm
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"                   // import 包名 → 这个文件
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "effect": "^4.0.0-beta.97"              // 只依赖 effect（叶子节点）
+  },
+  "devDependencies": {
+    "@tsconfig/bun": "latest",
+    "@types/bun": "latest"
+  }
+}
+```
 
-每个类型从 `interface` 升级为 `Schema.Struct`，同时保留同名类型导出：
+关键字段：
+- `"name": "@opencode-from-scratch/schema"`：包名。`@scope/name` 是 scoped 命名
+- `"exports": { ".": "./src/index.ts" }`：别人 `import { Message } from
+  "@opencode-from-scratch/schema"` 时实际加载的文件
+- `"dependencies": { "effect": ... }`：schema 包**只依赖 effect**——这是"叶子节点"
+  的定义：不依赖任何业务代码
+
+## 操作 2：写 packages/schema/src/types.ts（Effect Schema 重写）
+
+把 `src/types.ts` 的 4 个类型 + `service/config.ts` 的 1 个重复类型搬进来，
+全部升级为 Schema：
 
 ```typescript
 // packages/schema/src/types.ts
+import { Schema } from "effect"
 
-// 值（运行期校验器）
+// ── ToolCall：LLM 返回的工具调用 ──
+export const ToolCall = Schema.Struct({
+  id: Schema.String,
+  type: Schema.Literal("function"),          // 只能等于 "function"
+  function: Schema.Struct({
+    name: Schema.String,
+    arguments: Schema.String,
+  }),
+})
+export type ToolCall = Schema.Schema.Type<typeof ToolCall>
+
+// ── Message：一条对话消息 ──
 export const Message = Schema.Struct({
   role: Schema.Literals(["system", "user", "assistant", "tool"]), // 联合字面量
-  content: Schema.NullOr(Schema.String), // string 或 null
-  tool_calls: Schema.optional(Schema.Array(ToolCall)), // 可选字段
+  content: Schema.NullOr(Schema.String),     // string 或 null
+  tool_calls: Schema.optional(Schema.Array(ToolCall)),
   tool_call_id: Schema.optional(Schema.String),
 })
-
-// 类型（编译期用）——和值同名，TS 允许共存
 export type Message = Schema.Schema.Type<typeof Message>
+
+// ── ProviderConfig：配置文件的 provider 结构 ──
+export const ProviderConfig = Schema.Struct({
+  name: Schema.String,
+  baseURL: Schema.String,
+  apiKey: Schema.String,
+  models: Schema.Record(Schema.String, Schema.Unknown),
+})
+export type ProviderConfig = Schema.Schema.Type<typeof ProviderConfig>
+
+// ── Config：配置文件结构 ──
+export const Config = Schema.Struct({
+  model: Schema.String,
+  provider: Schema.Record(Schema.String, ProviderConfig),
+})
+export type Config = Schema.Schema.Type<typeof Config>
+
+// ── ResolvedConfig：解析后的运行配置 ──
+// 之前定义在 service/config.ts（本地 interface Config），搬进来并改名，
+// 和上面的"配置文件结构 Config"区分开
+export const ResolvedConfig = Schema.Struct({
+  baseURL: Schema.String,
+  apiKey: Schema.String,
+  modelID: Schema.String,
+})
+export type ResolvedConfig = Schema.Schema.Type<typeof ResolvedConfig>
 ```
 
-### 用到的 Schema 构造器
+### 关键设计：值和类型同名
+
+每个 schema 同时导出了**值**（`export const Message`）和**类型**（`export type Message`）。
+TS 允许值和类型同名共存：
+
+```typescript
+export const Message = Schema.Struct({...})  // 值：运行期校验器
+export type Message = Schema.Schema.Type<typeof Message>  // 类型：编译期
+```
+
+- `import { Message } from "@opencode-from-scratch/schema"` → 拿值（校验器）
+- `import type { Message } from "@opencode-from-scratch/schema"` → 拿类型（标注用）
+
+### 用到的 Schema 构造器（复习阶段 13 + 新增）
 
 | 构造器 | 作用 | Python 类比 |
 |--------|------|------------|
 | `Schema.Struct({...})` | 定义对象形状 | `pydantic.BaseModel` |
-| `Schema.Literals(["a","b"])` | 只能取这几个值之一（联合字面量） | `Literal["a","b"]` |
 | `Schema.Literal("x")` | 只能等于一个固定值 | `Literal["x"]` |
+| `Schema.Literals(["a","b"])` | 只能取这几个值之一（**注意是复数，数组参数**） | `Literal["a","b"]` |
 | `Schema.NullOr(Schema.String)` | string 或 null | `str \| None` |
-| `Schema.optional(Schema.X)` | 可选字段 | 可选字段 / default None |
+| `Schema.optional(Schema.X)` | 可选字段 | 可选字段 |
 | `Schema.Array(Schema.X)` | 数组 | `list[X]` |
 | `Schema.Record(Schema.String, Schema.X)` | 键值对 | `dict[str, X]` |
+| `Schema.Unknown` | 任意值 | `Any` |
 | `Schema.Schema.Type<typeof X>` | 从 Schema 推导 TS 类型 | 类型推导 |
 
-## index.ts：barrel 统一出口
+> ⚠️ 一个容易踩的坑：阶段 13 demo 里我们用过 `Schema.Literal("system", "user", ...)`
+> （可变参数），但 beta.97 里 `Schema.Literal` 只接受**一个**参数（单值），
+> 多值联合要用 `Schema.Literals(["a","b"])`（复数 + 数组）。写错会报
+> "Expected 1 arguments, but got 4"。
+
+## 操作 3：写 packages/schema/src/index.ts（barrel）
 
 ```typescript
 // packages/schema/src/index.ts
 export { ToolCall, Message, ProviderConfig, Config, ResolvedConfig } from "./types"
 ```
 
-一行导出，同时导出**值**（Schema 校验器）和**同名类型**（TS 类型）。
-TS 允许值类型同名共存：`export const Message`（值）+ `export type Message`（类型）。
-上层 `import { Message }` 拿值（用于校验），`import type { Message }` 拿类型（用于标注）。
+一行导出，同时导出值 + 类型（因为 types.ts 里同名共存）。
 
-## 上层改造：9 个文件换导入
+## 验证：第 2 步成功标志
 
-所有从 `./types` / `../types` 导入的类型，改为从 schema 包导入：
-
-```typescript
-// 之前
-import type { Message, ToolCall } from "../types"
-
-// 现在
-import type { Message, ToolCall } from "@opencode-from-scratch/schema"
+```bash
+bunx tsc --noEmit    # schema 包自身类型无误（先不管 src/ 还没改导入）
 ```
 
-涉及文件（9 个）：
-- `src/` 根：`debug.ts`、`agent-loop.ts`、`index.ts`、`message.ts`、`provider.ts`
-- `src/provider/`：`anthropic.ts`、`openai.ts`
-- `src/service/`：`provider.ts`
-- `src/tui/`：`agent.tsx`
+如果 schema 包有错误，`bunx tsc --noEmit` 会指向 `packages/schema/src/types.ts`。
+此时 src/ 还有错误是正常的（第 3 步才改导入）。
 
-另外 `src/service/config.ts`：删掉本地重复的 `interface Config`，改用 schema 包的
-`ResolvedConfig`：
+## 对照 opencode
 
-```typescript
-// 之前（本地重复定义）
-export interface Config { baseURL: string; apiKey: string; modelID: string }
+opencode 的 schema 包（`opencode/packages/schema/`）：
+- 28 个领域 schema（Session、Message、ToolCall、Provider、Permission...）
+- `src/index.ts` 是 barrel，一行导出一堆
+- 只依赖 effect（`"effect": "catalog:"`）
 
-// 现在（从 schema 包导入）
-import type { ResolvedConfig } from "@opencode-from-scratch/schema"
-```
+我们用 5 个类型，结构完全一致，只是规模小。
 
-## 收尾：删除 src/types.ts
+## 小结
 
-类型全部搬走后，`src/types.ts` 没有内容了，删除它。
-
-```
-git rm src/types.ts
-```
-
-## 为什么"Schema 重写"比"只搬 interface"更好
-
-如果只是把 interface 搬过去，`import type { Message }` 拿到的还是普通类型——
-没有运行期校验。用 Schema 重写后：
-
-```
-一份定义（Schema.Struct）
-    ├── 编译期类型：type Message = Schema.Schema.Type<typeof Message>
-    └── 运行期校验器：Schema.decodeUnknownSync(Message)
-```
-
-这是阶段 13 学的"双重身份"，现在应用到了**所有共享类型**上。未来如果要对
-API 边界的数据做校验（阶段 19 server/client），直接用这些 Schema 即可。
-
-## 阶段 15.2 小结
-
-1. 5 个共享类型搬进 schema 包，用 Effect Schema 重写（双重身份）
-2. `index.ts` barrel 一行导出值 + 类型
-3. 9 个文件换导入 + config.ts 消除重复定义
-4. 删除 `src/types.ts`
+第 2 步做完，schema 契约层成立：5 个共享类型、Schema 重写、barrel 导出、
+只依赖 effect。但上层代码还没用它——`src/` 里仍从 `./types` 导入。
 
 ## 下一步
 
-[15.3 阶段验收](../03-review/01-review.md) —— typecheck + 跑通 + 工程思维。
+[15.3 第 3 步：上层改用 schema 包](../03-import-switch/01-import-switch.md)
+——9 个文件换导入，删除 src/types.ts。

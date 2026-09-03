@@ -642,7 +642,7 @@ opencode-from-scratch/
 >   - 对照 opencode：`packages/schema/src/` 的 28 个 schema、index.ts barrel 导出
 >   - 工程思维：契约层——下层定义"世界长什么样"，上层只依赖它，可被多包共享
 >
-> **产出**：`packages/{schema}` + `src/` 两层结构，共享类型在 schema 包。
+> **产出**：`packages/{schema, opencode}` 两层结构，共享类型在 schema 包，主应用在 opencode 包。
 
 ### 阶段 16：Core 领域服务化
 
