@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "opencode-from-scratch",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run src/index.ts",
+    "tui": "bun run src/tui/hello.tsx",
+    "tui:debug": "bun --inspect=ws://localhost:6499/debug src/tui/agent.tsx",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@opencode-from-scratch/schema": "workspace:*",
+    "@opentui/core": "^0.4.3",
+    "@opentui/solid": "^0.4.3",
+    "drizzle-orm": "^0.45.2",
+    "effect": "^4.0.0-beta.97",
+    "opentui-spinner": "^0.0.7",
+    "solid-js": "^1.9.14",
+    "yargs": "^18.0.0"
+  },
+  "devDependencies": {
+    "@tsconfig/bun": "latest",
+    "@types/bun": "latest",
+    "@types/yargs": "^17.0.35",
+    "typescript": "latest"
+  }
+}

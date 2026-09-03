@@ -6,12 +6,12 @@
     "noEmit": true,
     "types": ["bun"],
     "paths": {
-      "@/*": ["./src/*"],
+      "@/*": ["./packages/opencode/src/*"],
       "@opencode-from-scratch/schema": ["./packages/schema/src/index.ts"]
     },
     "jsx": "preserve",
     "jsxImportSource": "@opentui/solid"
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "packages/**/*.ts"],
+  "include": ["packages/**/*.ts", "packages/**/*.tsx"],
   "exclude": ["node_modules", "opencode"]
 }

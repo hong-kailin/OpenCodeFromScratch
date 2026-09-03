@@ -7,24 +7,14 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "bun run src/index.ts",
-    "tui": "bun run src/tui/hello.tsx",
-    "tui:debug": "bun --inspect=ws://localhost:6499/debug src/tui/agent.tsx",
+    "dev": "bun run packages/opencode/src/index.ts",
+    "tui": "bun run packages/opencode/src/tui/hello.tsx",
+    "tui:debug": "bun --inspect=ws://localhost:6499/debug packages/opencode/src/tui/agent.tsx",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@tsconfig/bun": "latest",
     "@types/bun": "latest",
-    "@types/yargs": "^17.0.35",
     "typescript": "latest"
-  },
-  "dependencies": {
-    "@opentui/core": "^0.4.3",
-    "@opentui/solid": "^0.4.3",
-    "drizzle-orm": "^0.45.2",
-    "effect": "^4.0.0-beta.97",
-    "opentui-spinner": "^0.0.7",
-    "solid-js": "^1.9.14",
-    "yargs": "^18.0.0"
   }
 }
