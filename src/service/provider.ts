@@ -13,7 +13,7 @@
 // 对照 opencode：core/src/tool/registry.ts 里也这么干（yield* Database.Service 拿数据库服务）
 
 import { Context, Effect, Layer } from "effect"
-import type { Message, ToolCall } from "../types"
+import type { Message, ToolCall } from "@opencode-from-scratch/schema"
 import type { Tool } from "../tool/tool"
 import { createOpenAIProvider } from "../provider/openai"
 import { ConfigService } from "./config"

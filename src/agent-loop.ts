@@ -20,7 +20,7 @@
 // 校验失败的错误会作为工具结果喂回给 LLM（让它重新调用），而不是中断 loop
 
 import { Effect, Schema } from "effect"
-import type { Message } from "./types"
+import type { Message } from "@opencode-from-scratch/schema"
 import { truncate } from "./tool/truncate"
 import { ProviderService } from "./service/provider"
 import { ToolRegistry } from "./service/tool-registry"

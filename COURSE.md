@@ -617,12 +617,32 @@ opencode-from-scratch/
 > **为什么现在做**：单 package 里类型定义和业务逻辑混在一起，加新功能时类型重复定义、边界模糊。opencode 的 37 个 package 以 `schema` 为叶子节点--所有领域契约（Session/Message/Part/ToolPart/ToolState/Provider/Model/Permission）都定义在 schema 包，被 core/protocol/server/client 共享。先拆 schema 包，建立"契约层"概念。
 >
 > **核心主题**：
-> - Bun workspaces：monorepo 配置与包间引用
+> - Bun workspaces：monorepo 配置与包间引用（root package.json 的 workspaces 字段 + tsconfig paths 别名）
 > - package 分层边界：schema 是叶子（只依赖 effect），上层依赖下层
 > - 把现有 interface/类型搬到 schema 包，用 Effect Schema 重写
 > - 对照 opencode：`packages/schema/src/` 的 28 个领域 schema
 >
-> **产出**：`packages/{schema, opencode}` 两层结构，所有共享类型在 schema 包。
+> **课程**：
+>
+> - **15.1 Monorepo 是什么 + Bun workspaces 配置**
+>   - monorepo 动机：单 package 里类型和业务混在一起，边界模糊；opencode 的 37 个 package 分层
+>   - Bun workspaces：root package.json 加 `workspaces: ["packages/*"]`
+>   - tsconfig paths 别名：`@opencode-from-scratch/schema` → `packages/schema/src/index.ts`
+>   - 产出：目录结构 + 空 schema 包能 typecheck
+>
+> - **15.2 Schema 契约层：把共享类型搬到 schema 包**
+>   - 搬 `ToolCall` / `Message` / `ProviderConfig` / `Config` 到 `packages/schema/src/types.ts`
+>   - 用 Effect Schema 重写（`Schema.Struct` / `Schema.Union` / `Schema.Null`），对齐阶段 13
+>   - `Schema.Schema.Type<T>` 推导出 TS 类型（编译期）+ 运行期校验
+>   - schema 包只依赖 effect（叶子节点），不依赖业务代码
+>
+> - **15.3 上层改用 schema 包 + 验收**
+>   - 9 个文件从 `./types` / `../types` 改为 `@opencode-from-scratch/schema`
+>   - typecheck 通过、CLI 跑通、行为不变
+>   - 对照 opencode：`packages/schema/src/` 的 28 个 schema、index.ts barrel 导出
+>   - 工程思维：契约层——下层定义"世界长什么样"，上层只依赖它，可被多包共享
+>
+> **产出**：`packages/{schema}` + `src/` 两层结构，共享类型在 schema 包。
 
 ### 阶段 16：Core 领域服务化
 

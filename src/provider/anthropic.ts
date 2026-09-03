@@ -10,7 +10,7 @@
 // 我们简化版只展示核心的格式转换
 
 import type { Provider, ChatResult } from "../provider"
-import type { Message, ToolCall } from "../types"
+import type { Message, ToolCall } from "@opencode-from-scratch/schema"
 import type { Tool } from "../tool/tool"
 import { toolToOpenAIFormat } from "../tool/tool"
 

@@ -12,7 +12,7 @@
 
 import { Effect, Stream } from "effect"
 import type { Provider, ChatResult } from "../provider"
-import type { Message, ToolCall } from "../types"
+import type { Message, ToolCall } from "@opencode-from-scratch/schema"
 import type { Tool } from "../tool/tool"
 import { toolToOpenAIFormat } from "../tool/tool"
 import { debug } from "../debug"

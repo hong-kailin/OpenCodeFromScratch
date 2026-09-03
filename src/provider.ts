@@ -3,7 +3,7 @@
 // 对照 opencode: packages/llm/src/route/client.ts 的 Route 接口
 // opencode 的 Route 有四轴（Protocol + Endpoint + Auth + Framing），我们简化为一个方法
 
-import type { Message, ToolCall } from "./types"
+import type { Message, ToolCall } from "@opencode-from-scratch/schema"
 import type { Tool } from "./tool/tool"
 
 // chatWithTools 的返回值

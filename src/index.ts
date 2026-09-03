@@ -19,7 +19,7 @@
 import yargs from "yargs"
 import { hideBin } from "yargs/helpers"
 import { Effect, Layer } from "effect"
-import type { Message } from "./types"
+import type { Message } from "@opencode-from-scratch/schema"
 import { saveMessage, loadMessages } from "./message"
 import { buildSystemPrompt } from "./system-context"
 import { createSession, listSessions, getSession } from "./session"

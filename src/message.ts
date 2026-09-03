@@ -6,7 +6,7 @@
 
 import { db, messageTable } from "./db"
 import { eq, asc } from "drizzle-orm"
-import type { Message, ToolCall } from "./types"
+import type { Message, ToolCall } from "@opencode-from-scratch/schema"
 
 // ── Message ↔ DB 行的转换 ──────────────────────────────────
 // 核心挑战：Message 里有 tool_calls（对象数组），但 SQLite 只有 TEXT

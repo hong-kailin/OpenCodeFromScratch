@@ -3,7 +3,7 @@
 // --debug 开启时（中间件设 process.env.DEBUG = "1"），debug() 才会输出
 // 对照 opencode: 它用 Effect 的日志系统，带 logLevel 过滤；我们简化为环境变量开关
 
-import type { Message } from "./types"
+import type { Message } from "@opencode-from-scratch/schema"
 
 // 基础调试输出：只在 --debug 模式下打印
 // 用法：debug("step", 1) 或 debug("API 请求", url)

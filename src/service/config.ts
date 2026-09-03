@@ -15,19 +15,13 @@
 
 import { Context, Effect, Layer } from "effect"
 import { ConfigError } from "../error/errors"
-
-// Config 的形状：和之前 loadConfig() 返回的一致
-export interface Config {
-  baseURL: string
-  apiKey: string
-  modelID: string
-}
+import type { ResolvedConfig } from "@opencode-from-scratch/schema"
 
 // ── 1. ConfigServiceApi：声明这个服务能做什么 ────────────────
 // 名字我们自己起的，叫什么都行，只要和下面的 Context.Service 对上。
-// 只有一个能力：get()，返回 Config（包在 Effect 里，因为可能读文件失败）
+// 只有一个能力：get()，返回 ResolvedConfig（包在 Effect 里，因为可能读文件失败）
 export interface ConfigServiceApi {
-  readonly get: () => Effect.Effect<Config>
+  readonly get: () => Effect.Effect<ResolvedConfig>
 }
 
 // ── 2. ConfigService：创建 tag（唯一标识符）──────────────────
@@ -62,7 +56,7 @@ export const configLayer = Layer.effect(
       return yield* Effect.fail(new ConfigError({ message: `配置文件里找不到 provider: ${providerID}` }))
     }
 
-    const config: Config = {
+    const config: ResolvedConfig = {
       baseURL: provider.baseURL,
       apiKey: provider.apiKey,
       modelID,

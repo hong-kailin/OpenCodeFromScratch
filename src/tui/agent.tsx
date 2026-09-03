@@ -22,7 +22,7 @@ import { runAgentLoop } from "../agent-loop"
 import { configLayer } from "../service/config"
 import { providerLayer } from "../service/provider"
 import { toolRegistryLayer } from "../service/tool-registry"
-import type { Message } from "../types"
+import type { Message } from "@opencode-from-scratch/schema"
 
 // Layer 组装：和 CLI 入口一样，providerLayer 依赖 ConfigService
 const satisfiedProvider = providerLayer.pipe(Layer.provide(configLayer))
