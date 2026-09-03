@@ -11,7 +11,7 @@
 
 回顾单 package 时代的痛点（00-overview 提到）：
 - `src/types.ts` 定义 ToolCall/Message 等共享类型
-- 但 `service/config.ts` 里又**重复定义**了一个本地 `interface Config`——同名不同义
+- 但 `src/service/config.ts` 里又**重复定义**了一个本地 `interface Config`——同名不同义
 - 类型散落，没有统一归属
 
 契约层的价值：**一份定义，多方共享**。Message 只定义一次，CLI、TUI、agent-loop
@@ -50,7 +50,7 @@
 
 ## 操作 2：写 packages/schema/src/types.ts（Effect Schema 重写）
 
-把 `src/types.ts` 的 4 个类型 + `service/config.ts` 的 1 个重复类型搬进来，
+把 `src/types.ts` 的 4 个类型 + `src/service/config.ts` 的 1 个重复类型搬进来，
 全部升级为 Schema：
 
 ```typescript
@@ -138,6 +138,47 @@ export type Message = Schema.Schema.Type<typeof Message>  // 类型：编译期
 
 ## 操作 3：写 packages/schema/src/index.ts（barrel）
 
+### 先解释：barrel 是什么？
+
+**barrel**（直译"桶"）是 JS/TS 社区的一个术语，指**一种专门用来"汇总导出"的文件**——
+它自己不写任何逻辑，只是把别的文件里的导出"收集"起来再统一导出。
+
+```typescript
+// 一个 barrel 文件（index.ts 最常见）
+export { a, b, c } from "./module1"
+export { d, e } from "./module2"
+```
+
+为什么需要它？**让调用方只需要知道一个入口，不用记一堆文件路径**：
+
+```typescript
+// 没有 barrel：调用方要逐个记路径
+import { a } from "@opencode-from-scratch/schema/types"
+import { b } from "@opencode-from-scratch/schema/types"
+import { c } from "@opencode-from-scratch/schema/other"
+
+// 有 barrel：只 import 包名，内部自己分散
+import { a, b, c, d, e } from "@opencode-from-scratch/schema"
+```
+
+类比 Python：
+```python
+# __init__.py 就是 Python 的 barrel！
+# pkg/__init__.py
+from .module1 import a, b, c
+from .module2 import d, e
+
+# 调用方
+from pkg import a, d   # 不用 from pkg.module1 import a
+```
+
+> 所以 `src/index.ts` 作为 barrel 是 JS 社区惯例（Python 是 `__init__.py`）。
+> 我们的 schema 包只有一个 types.ts，barrel 看起来"多此一举"——但它确立了模式：
+> 以后 schema 包加更多文件（event.ts、model.ts...），调用方永远只 import 包名，
+> 不用改。这正是 opencode 有 28 个 schema 文件却只需要 `import { Session } from "@opencode-ai/schema"` 的原因。
+
+schema 包的 barrel：
+
 ```typescript
 // packages/schema/src/index.ts
 export { ToolCall, Message, ProviderConfig, Config, ResolvedConfig } from "./types"
@@ -148,11 +189,12 @@ export { ToolCall, Message, ProviderConfig, Config, ResolvedConfig } from "./typ
 ## 验证：第 2 步成功标志
 
 ```bash
-bunx tsc --noEmit    # schema 包自身类型无误（先不管 src/ 还没改导入）
+bunx tsc --noEmit    # schema 包自身类型无误 + 原 src 也正常
 ```
 
-如果 schema 包有错误，`bunx tsc --noEmit` 会指向 `packages/schema/src/types.ts`。
-此时 src/ 还有错误是正常的（第 3 步才改导入）。
+为什么此时 src 也正常：第 2 步只是新建了 schema 包，`src/types.ts` 还没删，
+上层 import 还是 `./types`（相对路径仍有效）。所以整个项目 typecheck 应该通过。
+schema 包尚未被使用——真正"切换"到 schema 包是第 4 步的事。
 
 ## 对照 opencode
 
@@ -166,9 +208,10 @@ opencode 的 schema 包（`opencode/packages/schema/`）：
 ## 小结
 
 第 2 步做完，schema 契约层成立：5 个共享类型、Schema 重写、barrel 导出、
-只依赖 effect。但上层代码还没用它——`src/` 里仍从 `./types` 导入。
+只依赖 effect。但上层代码还没用它——`packages/opencode/src/` 里仍从 `./types` 导入
+（第 3 步先搬主应用、第 4 步才改导入）。
 
 ## 下一步
 
-[15.3 第 3 步：上层改用 schema 包](../03-import-switch/01-import-switch.md)
-——9 个文件换导入，删除 src/types.ts。
+[15.3 第 3 步：主应用 src → packages/opencode](../04-move-main-app/01-move-main-app.md)
+——把业务代码整体搬进主应用包，形成真正的两层结构。

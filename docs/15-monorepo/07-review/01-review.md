@@ -15,17 +15,21 @@
 │     └── ...                                  │
 └──────────────────────────────────────────────┘
                     │
-        ┌───────────┼──────────────┐
-        ▼           ▼              ▼
-     第1步        第2步          第3步
-   搭骨架       建 schema 包     上层换导入
-  (workspaces  (5类型Schema   (9文件改from
-   +paths)      重写)          @opencode-...)
+        ┌───────────┼───────────────┐
+        ▼           ▼               ▼
+     第1步        第2步           第3步
+   搭骨架       建 schema 包     搬主应用
+  (workspaces  (5类型Schema    (git mv src
+   +paths)      重写)           →packages/
+                                opencode)
                     │
-                    ▼
-                 第4步 + 第5步
-          主应用搬进 packages/opencode
-          + 修 preload 坑
+        ┌───────────┼───────────────┐
+        ▼                           ▼
+     第4步                       第5步
+   上层换导入                   修 preload 坑
+  (9文件改from              (root 找不到
+   @opencode-...)           @opentui/solid)
+                    │
                     ▼
 阶段 15 结束的两层 monorepo
 ┌──────────────────────────────────────────────┐
@@ -38,7 +42,6 @@
 │     │   └── src/  types.ts + index.ts         │
 │     └── opencode/   主应用 (业务代码)          │
 │         ├── package.json                     │
-│         ├── bunfig.toml                      │
 │         └── src/  agent-loop.ts ...          │
 └──────────────────────────────────────────────┘
 ```
@@ -118,7 +121,6 @@ opencode-from-scratch/
 │   │       └── types.ts         # 5 个共享类型（Effect Schema 重写）
 │   └── opencode/                # 主应用（新增，src/ 搬入）
 │       ├── package.json         # name: opencode-from-scratch
-│       ├── bunfig.toml
 │       └── src/                 # 33 个文件（git rename）
 └── (src/ 已不存在)
 ```

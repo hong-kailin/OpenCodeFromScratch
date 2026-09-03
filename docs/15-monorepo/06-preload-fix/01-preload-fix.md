@@ -1,10 +1,10 @@
 # 15.5 第 5 步：修 bunfig preload 坑
 
-> 对照代码：`bunfig.toml`（root）、`packages/opencode/bunfig.toml`
+> 对照代码：`bunfig.toml`（root）
 
 ## 这一步做什么
 
-第 4 步搬完主应用后，CLI 和 TUI 会报一个错：
+第 3 步搬完主应用后，CLI 和 TUI 会报一个错：
 
 ```
 error: preload not found "@opentui/solid/preload"
@@ -45,9 +45,13 @@ bunfig preload="包名"          bunfig preload="包名" → root 找不到！
 
 ## 解法：preload 用相对路径指向子包
 
-opencode 的解法是**每个包自带 bunfig.toml**（`packages/tui/bunfig.toml`），
-从包目录内运行。但我们的项目用 root 统一入口，更简单的解法是让 root 的
-preload **直接用相对路径指向子包 node_modules 里的 preload 文件**：
+**为什么不用"每个包自带 bunfig"（opencode 的做法）**：Bun 发现 bunfig.toml 是
+从**当前工作目录**向上查找的。我们项目统一从 root 运行（`bun run dev`），
+所以只会读 root 的 bunfig.toml，`packages/opencode/bunfig.toml` 即使存在**也不生效**。
+opencode 之所以能每包自带，是因为它每个包从自己目录内运行（`cd packages/tui && bun run dev`）。
+
+所以对我们"root 统一入口"的项目，正确解法是让 root 的 preload **直接用相对路径
+指向子包 node_modules 里的 preload 文件**：
 
 ```toml
 # bunfig.toml（root）
@@ -56,10 +60,6 @@ preload = ["./packages/opencode/node_modules/@opentui/solid/scripts/preload.js"]
 
 为什么这样能行：相对路径不依赖"包解析"，Bun 从 root 直接按路径找文件，
 跨过 node_modules 解析，一定能找到。
-
-> 也可以选 opencode 的做法：在 `packages/opencode/` 放一个 bunfig.toml，
-> 然后从包目录运行。但对教学项目，root 统一入口更方便（`bun run dev` 就能跑），
-> 相对路径是最小改动。
 
 ## 验证：第 5 步成功标志
 
@@ -89,8 +89,10 @@ opencode 的 `packages/tui/bunfig.toml`：
 preload = ["@opentui/solid/preload"]
 ```
 
-它也是每个包自带 bunfig，从包目录内运行。我们的相对路径方案是对
-"root 统一入口"场景的适配，本质一样。
+opencode 每个包自带 bunfig、从包目录内运行（`cd packages/tui && bun run dev`），
+所以包名 `"@opentui/solid/preload"` 能解析（依赖就在该包自己的 node_modules）。
+我们用 root 统一入口，所以用相对路径——**两种方案对应两种运行方式**，本质都是
+"让 preload 能解析到真实存在的文件"。
 
 ## 小结
 
@@ -98,4 +100,4 @@ preload = ["@opentui/solid/preload"]
 
 ## 下一步
 
-[15.6 阶段验收](../06-review/01-review.md) —— 完整迁移回顾 + 验收清单 + 工程思维。
+[15.6 阶段验收](../07-review/01-review.md) —— 完整迁移回顾 + 验收清单 + 工程思维。

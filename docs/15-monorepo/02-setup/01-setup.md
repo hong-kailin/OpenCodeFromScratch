@@ -45,6 +45,38 @@
   `./packages/schema/src/index.ts`
 - `include` 加 `packages/**/*.ts`：让 tsc 也检查 schema 包的类型
 
+### `@/` 是什么？——项目自定义的路径别名
+
+`"@/*": ["./src/*"]` 里的 `@` **不是 TS 语法，也不是包名**，它是**项目自己定义的
+路径别名前缀**。含义：`@/xxx` 就等价于 `./src/xxx`。
+
+```
+paths 里写的：
+  "@/*": ["./src/*"]
+
+含义：
+  import x from "@/foo/bar"   →  tsc 替换成  import x from "./src/foo/bar"
+```
+
+为什么用 `@` 这个符号：
+- **`@` 不是合法包名首字符的常见用法**（npm 的 scoped 包除外），所以不会和真实包名冲突
+- 一眼就能区分"这是别名"（`@/` 开头）和"这是真包"（`@opencode-from-scratch/schema`）
+- 是社区约定俗成的惯例（Vue、Nuxt、Vite 等项目都用 `@/` 指代 src 目录）
+
+注意：`@` 不是特殊字符，换成 `#/`、`~/`、`src/` 都可以，只是项目要统一。opencode
+自己用的是 `@/`（例如 `import { Agent } from "@/agent/agent"`）。
+
+> ⚠️ 一个容易困惑的点：`@/`（别名，指向 src）和 `@opencode-from-scratch/schema`
+> （真实包名，指向 packages/schema）**都是 `@` 开头**，但性质完全不同：
+> - `@/` 是路径别名——**项目自己发明**的缩写，只对当前 tsconfig 生效
+> - `@opencode-from-scratch/schema` 是 npm scoped 包名——**有真实包**，Bun 从
+>   node_modules 或 workspaces 解析
+>
+> 判断方法：`@` 后面是 `/` → 别名；`@` 后面是名字 → scoped 包。
+
+类比 Python：`@/` 有点像在 `sys.path` 或 `PYTHONPATH` 里加的路径缩写——
+你规定"`@/` = 项目的 src 目录"，然后所有 `from @/foo import bar` 都能被解析。
+
 > 为什么用 paths 而不是 node_modules 软链？
 > Bun workspaces 默认会在 `node_modules/@opencode-from-scratch/schema` 建软链。
 > 但 tsc 解析软链有时会出问题，且需要 `bun install` 触发。paths 别名是
@@ -87,5 +119,5 @@ opencode 的根 `package.json` 也有 workspaces（`opencode/package.json`），
 
 ## 下一步
 
-[15.2 第 2 步：建 schema 契约层](../02-schema-package/01-schema-package.md)
+[15.2 第 2 步：建 schema 契约层](../03-schema-package/01-schema-package.md)
 ——把共享类型搬进 schema 包，用 Effect Schema 重写。

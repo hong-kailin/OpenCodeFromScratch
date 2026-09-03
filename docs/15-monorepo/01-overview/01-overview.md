@@ -1,7 +1,9 @@
-# 15.0 迁移总览：从单 package 到 monorepo
+# 15.0.2 迁移总览：从单 package 到 monorepo
 
 > 本课是整个阶段 15 的"地图"。先看清我们要从哪里走到哪里、分几步走，
 > 再进入后续每一课看具体怎么操作。
+>
+> 还不清楚 monorepo 是什么？先看 [15.0.1 什么是 Monorepo](../00-concept/01-what-is-monorepo.md)。
 
 ## 起点：单 package 的结构（阶段 14 结束时）
 
@@ -62,18 +64,18 @@ opencode-from-scratch/
     packages/schema/src/index.ts：barrel 导出
     → schema 包成立（叶子节点，只依赖 effect）
 
-第 3 步：上层改用 schema 包
-    9 个文件把 import { Message } from "./types" 改成 from "@opencode-from-scratch/schema"
-    service/config.ts 删本地重复 Config，改用 schema 包的 ResolvedConfig
-    删除 src/types.ts
-    → typecheck 通过，功能不变
-
-第 4 步：主应用搬进 packages/opencode（本阶段新增）
+第 3 步：主应用搬进 packages/opencode（先搬，再改导入）
     git mv src/ packages/opencode/src/
     新建 packages/opencode/package.json
     root package.json 的 scripts 指向 packages/opencode
     tsconfig paths 的 @/* 指向 packages/opencode/src
-    → 两层结构形成：packages/{schema, opencode}
+    → 两层结构形成：packages/{schema, opencode}（import 还没改，仍是 ./types）
+
+第 4 步：上层改用 schema 包
+    9 个文件把 import { Message } from "./types" 改成 from "@opencode-from-scratch/schema"
+    service/config.ts 删本地重复 Config，改用 schema 包的 ResolvedConfig
+    删除 packages/opencode/src/types.ts
+    → typecheck 通过，功能不变
 
 第 5 步：修 bunfig preload（迁移踩到的坑）
     主应用搬走后，root 找不到 @opentui/solid
@@ -81,19 +83,24 @@ opencode-from-scratch/
     → CLI 和 TUI 都能跑
 ```
 
+> 为什么先"搬主应用"再"改导入"？因为 `git mv` 不改变文件内容，搬移后内部
+> 相对路径 import 全都不用动——真正要改路径的是第 4 步的 9 个 import。
+> 先搬再改，每步的路径都写当前真实状态，不会出现"文档说 src/ 但实际在
+> packages/opencode/src/"的困惑。
+
 ## 每一步的验证标准
 
 | 步骤 | 怎么确认成功了 |
 |------|---------------|
 | 第 1 步 | `bunx tsc --noEmit` 通过（空 schema 包 + 原 src 共存） |
 | 第 2 步 | schema 包自身 typecheck 通过 |
-| 第 3 步 | `bunx tsc --noEmit` 通过、CLI 跑通、功能不变 |
-| 第 4 步 | `bunx tsc --noEmit` 通过、git 显示 33 个文件都是 rename 不是 delete+add |
+| 第 3 步 | `bunx tsc --noEmit` 通过、git 显示 33 个文件都是 rename 不是 delete+add（import 还是 ./types） |
+| 第 4 步 | `bunx tsc --noEmit` 通过、CLI 跑通、功能不变 |
 | 第 5 步 | `bun run packages/opencode/src/index.ts` 能跑、TUI 能启动 |
 
-## 一个重要的工程决策：为什么第 4 步现在做
+## 一个重要的工程决策：为什么"搬主应用"现在做
 
-最初设计只做 schema 包（第 1-3 步），主应用留在根 src/。但对照 opencode 的最终形态
+最初设计只做 schema 包，主应用留在根 src/。但对照 opencode 的最终形态
 （37 个 package，主应用在 `packages/opencode/`），**把 src/ 搬进 packages/opencode 只是
 纯工程量**（搬文件 + 改路径），后面没有专门课程负责它，所以应该现在就做，
 让结构一步到位对齐 opencode。
@@ -115,5 +122,5 @@ opencode 的 `packages/opencode/package.json` name 就叫 `opencode`，我们的
 
 ## 下一步
 
-[15.1 第 1 步：配置 Bun workspaces + tsconfig paths](../01-setup/01-setup.md)
+[15.1 第 1 步：配置 Bun workspaces + tsconfig paths](../02-setup/01-setup.md)
 ——动手搭 monorepo 骨架。

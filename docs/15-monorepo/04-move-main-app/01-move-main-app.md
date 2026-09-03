@@ -1,12 +1,16 @@
-# 15.4 第 4 步：主应用 src → packages/opencode
+# 15.3 第 3 步：主应用 src → packages/opencode
 
 > 对照代码：`packages/opencode/package.json`、`package.json`（root）、`tsconfig.json`
 
 ## 这一步做什么
 
-第 1-3 步只拆了 schema 包，业务代码还在根 `src/`。这步把整个 `src/` 搬进
+第 1-2 步只拆了 schema 包，业务代码还在根 `src/`。这步把整个 `src/` 搬进
 `packages/opencode/src/`，形成 `packages/{schema, opencode}` 两层结构——
 对齐 opencode 的最终形态（主应用在 `packages/opencode/`）。
+
+> **注意顺序**：这步（移动）在"改导入"（第 4 步）**之前**。此时代码还在根 `src/`，
+> import 还是 `./types`。移动用 `git mv` 不改变文件内容，所以内部相对路径 import
+> 全部不用动——真正改导入是第 4 步的事。
 
 ## 为什么这步"现在做"而不是"以后做"
 
@@ -141,39 +145,36 @@ bun install          # 让 Bun 建立新 workspace 链接
 bunx tsc --noEmit    # 类型检查
 ```
 
-如果 `bun install` 后 `bunx tsc --noEmit` 通过，第 4 步完成。
+如果 `bun install` 后 `bunx tsc --noEmit` 通过，第 3 步完成。
 
-## 验证：第 4 步成功标志
+## 验证：第 3 步成功标志
 
 ```bash
 git status     # 33 个文件都显示 R（rename），不是 D+A
-bunx tsc --noEmit   # 通过
+bunx tsc --noEmit   # 通过（此时 import 还是 ./types，相对路径仍有效）
 ```
 
-注意此时直接跑 CLI 可能报 preload 错误（第 5 步解决）：
-
-```bash
-bun run packages/opencode/src/index.ts run "你好"
-# 可能报: error: preload not found "@opentui/solid/preload"
-```
+此时直接跑 CLI 可能报 preload 错误（原因见下，第 6 步解决）：
+`error: preload not found "@opentui/solid/preload"`
 
 ## 为什么搬移后 preload 会坏
 
 `@opentui/solid` 依赖从 root 移到了 `packages/opencode/node_modules`。
 但 root 的 `bunfig.toml` 里 preload 写的是包名 `"@opentui/solid/preload"`，
 Bun 从 root 运行时按包名解析，root 的 node_modules 里已经没有它了。
-这个问题在第 5 步解决。
+这个问题在第 6 步（06-preload-fix）解决。
 
 ## 小结
 
-第 4 步做完，真正的两层 monorepo 形成：
+第 3 步做完，真正的两层 monorepo 结构形成：
 ```
 packages/schema    契约层（类型）
 packages/opencode  主应用（业务代码）
 ```
-git 用 rename 保留了历史，root 变成聚合点。
+git 用 rename 保留了历史，root 变成聚合点。此时代码还在用 `./types` 导入
+（移动不改内容），下一步改导入。
 
 ## 下一步
 
-[15.5 第 5 步：修 bunfig preload 坑](../05-preload-fix/01-preload-fix.md)
-——让 CLI 和 TUI 能跑。
+[15.4 第 4 步：上层改用 schema 包](../05-import-switch/01-import-switch.md)
+——把 9 个文件的 import 从 ./types 改成 schema 包。
