@@ -5,7 +5,7 @@
       "type": "bun",
       "request": "launch",
       "name": "调试（预设输入）",
-      "program": "src/index.ts",
+      "program": "packages/opencode/src/index.ts",
       "cwd": "${workspaceFolder}",
       "args": [
         "run"
@@ -18,7 +18,7 @@
       "type": "bun",
       "request": "launch",
       "name": "调试（非交互模式）",
-      "program": "src/index.ts",
+      "program": "packages/opencode/src/index.ts",
       "cwd": "${workspaceFolder}",
       "args": [
         "run",
@@ -30,7 +30,7 @@
       "type": "bun",
       "request": "launch",
       "name": "调试（恢复上次会话）",
-      "program": "src/index.ts",
+      "program": "packages/opencode/src/index.ts",
       "cwd": "${workspaceFolder}",
       "args": [
         "run",
@@ -41,7 +41,7 @@
       "type": "bun",
       "request": "launch",
       "name": "调试（恢复指定会话）",
-      "program": "src/index.ts",
+      "program": "packages/opencode/src/index.ts",
       "cwd": "${workspaceFolder}",
       "args": [
         "run",
