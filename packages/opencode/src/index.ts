@@ -20,14 +20,20 @@ import yargs from "yargs"
 import { hideBin } from "yargs/helpers"
 import { Effect, Layer } from "effect"
 import type { Message } from "@opencode-from-scratch/schema"
-import { saveMessage, loadMessages } from "./message"
-import { buildSystemPrompt } from "./system-context"
-import { createSession, listSessions, getSession } from "./session"
-import { debug, debugMessages } from "./debug"
+import {
+  saveMessage,
+  loadMessages,
+  buildSystemPrompt,
+  createSession,
+  listSessions,
+  getSession,
+  debug,
+  debugMessages,
+  configLayer,
+  providerLayer,
+  toolRegistryLayer,
+} from "@opencode-from-scratch/core"
 import { runAgentLoop } from "./agent-loop"
-import { configLayer } from "./service/config"
-import { providerLayer } from "./service/provider"
-import { toolRegistryLayer } from "./service/tool-registry"
 
 // ── Layer 组装 ──────────────────────────────────────────────
 // providerLayer 依赖 ConfigService，所以要先喂给它

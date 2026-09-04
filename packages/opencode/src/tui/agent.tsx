@@ -17,11 +17,8 @@ import { createSignal, For, Show } from "solid-js"
 import type { TextareaRenderable } from "@opentui/core"
 import "opentui-spinner/solid"
 import { Effect, Layer } from "effect"
-import { buildSystemPrompt } from "../system-context"
+import { buildSystemPrompt, configLayer, providerLayer, toolRegistryLayer } from "@opencode-from-scratch/core"
 import { runAgentLoop } from "../agent-loop"
-import { configLayer } from "../service/config"
-import { providerLayer } from "../service/provider"
-import { toolRegistryLayer } from "../service/tool-registry"
 import type { Message } from "@opencode-from-scratch/schema"
 
 // Layer 组装：和 CLI 入口一样，providerLayer 依赖 ConfigService

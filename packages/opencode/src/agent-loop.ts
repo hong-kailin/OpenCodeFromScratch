@@ -21,10 +21,7 @@
 
 import { Effect, Schema } from "effect"
 import type { Message } from "@opencode-from-scratch/schema"
-import { truncate } from "./tool/truncate"
-import { ProviderService } from "./service/provider"
-import { ToolRegistry } from "./service/tool-registry"
-import { ToolError } from "./error/errors"
+import { truncate, ProviderService, ToolRegistry, ToolError } from "@opencode-from-scratch/core"
 
 // 回调接口：调用方决定怎么处理事件
 export interface LoopCallbacks {

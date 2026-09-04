@@ -11,7 +11,7 @@
 // 对外接口不变（chatWithTools 签名一样），agent-loop / CLI / TUI 都不用动
 
 import { Effect, Stream } from "effect"
-import type { Provider, ChatResult } from "../provider"
+import type { Provider, ChatResult } from "./interface"
 import type { Message, ToolCall } from "@opencode-from-scratch/schema"
 import type { Tool } from "../tool/tool"
 import { toolToOpenAIFormat } from "../tool/tool"

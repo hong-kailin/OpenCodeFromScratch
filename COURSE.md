@@ -658,6 +658,45 @@ opencode-from-scratch/
 > - Provider 服务：封装 LLM 调用（阶段 18 升级成 Route）
 > - 对照 opencode：`packages/core/src/` 的领域文件 + 同名子目录结构
 >
+> **课程**：
+>
+> - **16.1 现状盘点 + 建 core 包：把领域逻辑搬进 packages/core**
+>   - 盘点：哪些已是 Service（config/provider/tool-registry），哪些还是模块级函数（db/session/message/system-context）
+>   - 建 `packages/core`：package.json + tsconfig paths + bunfig preload 同步
+>   - 把 service/、tool/、provider/、db/session/message/system-context 全部搬进 core
+>   - import 改为 `@opencode-from-scratch/core`，验证 typecheck + CLI/TUI 跑通
+>   - 产出：`packages/{schema, core, opencode}` 三层结构，纯搬移不改逻辑
+>
+> - **16.2 Database 服务：模块级单例 → Effect Service**
+>   - 问题：db.ts 是模块级单例（import 即建库），无法替换、测试困难
+>   - Database Service：Layer 提供 drizzle 实例，PRAGMA + 建表在 Layer 里执行
+>   - 消费方 `yield* Database.Service` 拿 db，对照 opencode `database/database.ts`
+>   - 产出：`core/src/database/database.ts`，session/message 改用服务
+>
+> - **16.3 Filesystem 服务：封装文件读写 + glob + grep**
+>   - 问题：工具直接调 fs/Bun，逻辑散在各工具里，无法 mock
+>   - FileSystem Service：read/write/glob/grep 全套（读+写）
+>   - 工具改为从 Context 取 FileSystem 服务，对照 opencode `filesystem.ts`
+>   - 产出：`core/src/filesystem.ts`，read/write/edit/glob/grep 工具改用服务
+>
+> - **16.4 Tool 注册表服务化：工具的注册与查找**
+>   - ToolRegistry 从"数组列表"升级为"可注册的注册表"（register + list + get）
+>   - 工具从 Context 取 FileSystem，不再直接 import fs
+>   - 对照 opencode `core/src/tool/registry.ts`
+>   - 产出：`core/src/tool/registry.ts`，工具注册可增量
+>
+> - **16.5 Session 存储服务：session + message 服务化**
+>   - 问题：session.ts / message.ts 是模块级函数，直接 import db 单例
+>   - SessionStore Service：create/list/get/update + saveMessage/loadMessages
+>   - 依赖 Database Service，对照 opencode `core/src/session/store.ts`
+>   - 产出：`core/src/session/store.ts`，CLI/TUI 通过服务访问存储
+>
+> - **16.6 SystemContext 服务 + 上层接入 + 验收**
+>   - SystemContext Service：buildSystemPrompt 封装成服务
+>   - CLI/TUI 入口改成从 core 包导入所有服务，opencode 包瘦身
+>   - 验收：typecheck 通过、CLI/TUI 跑通、功能与阶段 15 一致
+>   - 工程思维：服务化的价值——可替换实现、测试时 mock、边界清晰
+>
 > **产出**：`packages/{schema, core, opencode}` 三层结构，agent 通过 Context 取用 core 服务。
 
 ### 阶段 17：Session 事件溯源
@@ -840,12 +879,12 @@ opencode-from-scratch/
 - [x] 阶段 7：System Context & AGENTS.md
 - [x] 阶段 8：CLI 入口
 - [x] 阶段 9：TUI 终端界面
-- [ ] 阶段 10：Effect 基础（延迟的计算描述）
-- [ ] 阶段 11：Service + Layer（依赖注入）
-- [ ] 阶段 12：用 Effect 重构 agent loop
-- [ ] 阶段 13：Effect Schema + Typed Errors
-- [ ] 阶段 14：Effect Stream（流式重写）
-- [ ] 阶段 15：Monorepo 拆分 + Schema 契约层
+- [x] 阶段 10：Effect 基础（延迟的计算描述）
+- [x] 阶段 11：Service + Layer（依赖注入）
+- [x] 阶段 12：用 Effect 重构 agent loop
+- [x] 阶段 13：Effect Schema + Typed Errors
+- [x] 阶段 14：Effect Stream（流式重写）
+- [x] 阶段 15：Monorepo 拆分 + Schema 契约层
 - [ ] 阶段 16：Core 领域服务化
 - [ ] 阶段 17：Session 事件溯源
 - [ ] 阶段 18：LLM Route 四轴模型
@@ -857,4 +896,4 @@ opencode-from-scratch/
 - [ ] 阶段 24：Compaction + 高级特性
 - [ ] 阶段 25：Web UI + Desktop
 
-> **下一步**：进入阶段 10 前先细化具体课程内容。阶段 10-14 拆分自原阶段 10，将 Effect 的核心概念（基础/Schema/Stream/Service+Layer）拆成独立阶段，每个聚焦一个主题。
+> **下一步**：阶段 0-15 已完成（agent loop 跑通 + schema 契约层 + monorepo 两层结构）。阶段 16 把散落的领域逻辑（db/session/message/system-context/tool）搬进 `packages/core` 并服务化，产出 `packages/{schema, core, opencode}` 三层。进入阶段 16 前先细化其课程内容。

@@ -15,8 +15,8 @@
 import { Context, Effect, Layer } from "effect"
 import type { Message, ToolCall } from "@opencode-from-scratch/schema"
 import type { Tool } from "../tool/tool"
-import { createOpenAIProvider } from "../provider/openai"
-import { ConfigService } from "./config"
+import { createOpenAIProvider } from "./openai"
+import { ConfigService } from "../config/config"
 
 // ── 1. ProviderServiceApi：声明能力 ─────────────────────────
 // 只有一个能力：chatWithTools（和之前 Provider 接口的方法一致）

@@ -9,7 +9,7 @@
 // opencode 的实现有 500+ 行（Schema 校验、状态机、缓存控制等）
 // 我们简化版只展示核心的格式转换
 
-import type { Provider, ChatResult } from "../provider"
+import type { Provider, ChatResult } from "./interface"
 import type { Message, ToolCall } from "@opencode-from-scratch/schema"
 import type { Tool } from "../tool/tool"
 import { toolToOpenAIFormat } from "../tool/tool"
