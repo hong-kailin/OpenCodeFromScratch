@@ -39,7 +39,13 @@ export { grepTool } from "./tool/grep"
 export { truncate } from "./tool/truncate"
 
 // ── 数据库与存储 ────────────────────────────────────────
-export { db, sessionTable, messageTable } from "./database/database"
+export {
+  DatabaseService,
+  databaseLayer,
+  db,
+  sessionTable,
+  messageTable,
+} from "./database/database"
 export { createSession, listSessions, getSession, updateSession } from "./session/session"
 export type { Session } from "./session/session"
 export { saveMessage, loadMessages } from "./session/message"
