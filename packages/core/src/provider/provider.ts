@@ -24,7 +24,7 @@ import { ConfigService } from "../config/config"
 export interface ProviderServiceApi {
   readonly chatWithTools: (
     messages: Message[],
-    tools: Tool[],
+    tools: Tool<any, any>[],
     onChunk: (text: string) => void,
   ) => Promise<{ text: string; toolCalls: ToolCall[] }>
 }

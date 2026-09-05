@@ -21,7 +21,13 @@
 
 import { Effect, Schema } from "effect"
 import type { Message } from "@opencode-from-scratch/schema"
-import { truncate, ProviderService, ToolRegistry, ToolError } from "@opencode-from-scratch/core"
+import {
+  truncate,
+  ProviderService,
+  ToolRegistry,
+  FileSystemService,
+  ToolError,
+} from "@opencode-from-scratch/core"
 
 // 回调接口：调用方决定怎么处理事件
 export interface LoopCallbacks {
@@ -50,6 +56,9 @@ export const runAgentLoop = Effect.fn("runAgentLoop")(function* (
   let step = 0
   while (step < MAX_STEPS) {
     step++
+
+    // 从 Context 取 FileSystem 服务——工具 execute 需要它（16.3 起工具走服务）
+    const fs = yield* FileSystemService
 
     // 调 LLM：chatWithTools 返回 Promise，用 Effect.promise 桥接
     const result = yield* Effect.promise(() =>
@@ -95,16 +104,18 @@ export const runAgentLoop = Effect.fn("runAgentLoop")(function* (
         // 注意：mapError 要包在 Schema 解码这一段，而不是整个链上。
         // 如果包在整个链上，JSON.parse 阶段的 ToolError 也会被 mapError 再包装一次，
         // 导致错误文本冗余（"校验失败: ToolError: 不是合法 JSON"）。
-        const decodeAndRun = (rawArgs: unknown) =>
-          Schema.decodeUnknownEffect(tool.parameters)(rawArgs).pipe(
-            // Schema 校验失败：转成带 tag 的 ToolError
-            Effect.mapError(
-              (e) => new ToolError({ message: `工具 ${tool.id} 参数校验失败: ${String(e)}`, toolName: tool.id }),
-            ),
-            // 校验通过：args 类型安全，执行工具
-            Effect.flatMap((args) => Effect.promise(() => tool.execute(args))),
-          )
-
+        // 阶段 16.3：tool.execute(args) 现在直接返回 Effect（不再包 Effect.promise）
+        // 因为工具内部已经能 yield* FileSystem.Service 取依赖了。
+        //
+        // 关于类型（重要，教学点）：
+        //   注册表返回 Tool<any, any>，所以 tool.execute 的 R 类型是 any（泛型丢失）。
+        //   Effect.gen/Effect.fn 有个已知特性：只要 yield* 的 Effect 的 R 是 any，
+        //   整个 generator 的 R 就会退化成 any（污染）。所以必须在这里把 R 收干净。
+        //   运行时工具确实需要 FileSystem 服务——用 Effect.provideService 显式喂入
+        //   （fs 是本函数开头 yield* FileSystemService 拿到的实例）。
+        //   类型层面：provideService 对 any 无法收窄，所以在整个 runTool 的"最终结果"
+        //   上做一次断言，告诉 tsc"工具所需的服务已全部提供"。
+        //   对照 opencode：它在更早的层面 provide 完整 Context，我们这里是"执行时即时提供"。
         const runTool = Effect.try({
           try: () => JSON.parse(tc.function.arguments),
           catch: (e) =>
@@ -113,9 +124,22 @@ export const runAgentLoop = Effect.fn("runAgentLoop")(function* (
               toolName: tool.id,
             }),
         }).pipe(
-          Effect.flatMap(decodeAndRun),
+          Effect.flatMap((rawArgs) =>
+            Schema.decodeUnknownEffect(tool.parameters)(rawArgs).pipe(
+              Effect.mapError(
+                (e) => new ToolError({ message: `工具 ${tool.id} 参数校验失败: ${String(e)}`, toolName: tool.id }),
+              ),
+              // 校验通过：执行工具。先 provide FileSystem（运行时必需），再断言 R 已满足
+              Effect.flatMap((args) =>
+                tool.execute(args).pipe(Effect.provideService(FileSystemService, fs)),
+              ),
+            ),
+          ),
           // 兜底：任何失败（ToolError / execute 抛错）都转成错误文本，不中断 loop
           Effect.catch((e) => Effect.succeed(e instanceof Error ? e.message : String(e))),
+          // 关键：在这里（整个 runTool 的最终结果）把 R 从 any 断言成 never。
+          // 这样 generator 只 yield* 一个 R=never 的 Effect，不会污染 runAgentLoop 的 R。
+          (effect) => effect as Effect.Effect<string, never, never>,
         )
         output = yield* runTool
       }

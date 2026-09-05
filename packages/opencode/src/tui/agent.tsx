@@ -17,13 +17,19 @@ import { createSignal, For, Show } from "solid-js"
 import type { TextareaRenderable } from "@opentui/core"
 import "opentui-spinner/solid"
 import { Effect, Layer } from "effect"
-import { buildSystemPrompt, configLayer, providerLayer, toolRegistryLayer } from "@opencode-from-scratch/core"
+import { buildSystemPrompt, configLayer, providerLayer, toolRegistryLayer, fileSystemLayer } from "@opencode-from-scratch/core"
 import { runAgentLoop } from "../agent-loop"
 import type { Message } from "@opencode-from-scratch/schema"
 
 // Layer 组装：和 CLI 入口一样，providerLayer 依赖 ConfigService
+// fileSystemLayer 也不能少——工具 execute 需要 FileSystem 服务（16.3）
 const satisfiedProvider = providerLayer.pipe(Layer.provide(configLayer))
-const appLayers = Layer.mergeAll(configLayer, satisfiedProvider, toolRegistryLayer)
+const appLayers = Layer.mergeAll(
+  configLayer,
+  satisfiedProvider,
+  toolRegistryLayer,
+  fileSystemLayer,
+)
 
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 

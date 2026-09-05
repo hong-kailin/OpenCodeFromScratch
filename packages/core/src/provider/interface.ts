@@ -22,9 +22,11 @@ export interface Provider {
   // 带 tool calling 的流式对话
   // 输入：messages 历史、tools 列表、onChunk 回调（流式输出文本）
   // 输出：完整文本 + tool calls
+  // tools 用宽松类型（Tool<any, any>）——LLM 侧只看工具的 id/description/parameters，
+  // 不关心 execute 需要哪些服务（R）
   chatWithTools(
     messages: Message[],
-    tools: Tool[],
+    tools: Tool<any, any>[],
     onChunk: (text: string) => void,
   ): Promise<ChatResult>
 }

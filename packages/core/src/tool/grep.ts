@@ -4,9 +4,11 @@
 //
 // 阶段 13 改动：参数定义从手写 JSON Schema 改为 Effect Schema（单一来源）
 // include 是可选字段，用 Schema.optional
+// 阶段 16.3 改动：execute 改 Effect，搜索逻辑走 FileSystem 服务
 
-import { Schema } from "effect"
+import { Effect, Schema } from "effect"
 import type { Tool } from "./tool"
+import { FileSystemService } from "../filesystem"
 import DESCRIPTION from "./grep.txt"
 
 export const Parameters = Schema.Struct({
@@ -16,46 +18,20 @@ export const Parameters = Schema.Struct({
   }),
 })
 
-async function execute(args: Schema.Schema.Type<typeof Parameters>): Promise<string> {
-  const { pattern } = args
-  const include = args.include || "**/*"
+const execute = (args: Schema.Schema.Type<typeof Parameters>) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystemService
+    const { pattern } = args
+    const include = args.include || "**/*"
 
-  // 编译正则表达式（i 表示不区分大小写）
-  // 类比 Python: re.compile(pattern, re.IGNORECASE)
-  const regex = new RegExp(pattern, "i")
+    // 搜索逻辑走 FileSystem 服务（glob 找文件 + 读内容 + 正则匹配）
+    const results = yield* Effect.promise(() => fs.grep(pattern, include))
 
-  const results: string[] = []
+    if (results.length === 0) return "没有找到匹配的内容"
+    return results.join("\n")
+  })
 
-  // 1. 用 glob 找到要搜索的文件
-  const glob = new Bun.Glob(include)
-
-  for await (const filePath of glob.scan(".")) {
-    // 跳过 node_modules 和 opencode 目录
-    if (filePath.startsWith("node_modules") || filePath.startsWith("opencode")) continue
-
-    // 2. 读文件内容
-    const file = Bun.file(filePath)
-    const exists = await file.exists()
-    if (!exists) continue
-
-    const text = await file.text()
-    const lines = text.split("\n")
-
-    // 3. 逐行匹配
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i]
-      if (line && regex.test(line)) {
-        // 输出格式和 ripgrep 一样：文件路径:行号: 内容
-        results.push(`${filePath}:${i + 1}: ${line.trim()}`)
-      }
-    }
-  }
-
-  if (results.length === 0) return "没有找到匹配的内容"
-  return results.join("\n")
-}
-
-export const grepTool: Tool<typeof Parameters> = {
+export const grepTool: Tool<typeof Parameters, FileSystemService> = {
   id: "grep",
   description: DESCRIPTION,
   parameters: Parameters,

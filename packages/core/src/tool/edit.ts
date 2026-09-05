@@ -5,9 +5,11 @@
 //
 // 阶段 13 改动：参数定义从手写 JSON Schema 改为 Effect Schema（单一来源）
 // 注意 Schema.optional：可选字段，execute 里类型是 boolean | null | undefined
+// 阶段 16.3 改动：execute 改 Effect，读/写都走 FileSystem 服务
 
-import { Schema } from "effect"
+import { Effect, Schema } from "effect"
 import type { Tool } from "./tool"
+import { FileSystemService } from "../filesystem"
 import DESCRIPTION from "./edit.txt"
 
 export const Parameters = Schema.Struct({
@@ -21,47 +23,46 @@ export const Parameters = Schema.Struct({
   }),
 })
 
-async function execute(args: Schema.Schema.Type<typeof Parameters>): Promise<string> {
-  const { filePath, oldString, newString, replaceAll } = args
+const execute = (args: Schema.Schema.Type<typeof Parameters>) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystemService
+    const { filePath, oldString, newString, replaceAll } = args
 
-  // 1. 读文件
-  const file = Bun.file(filePath)
-  const exists = await file.exists()
-  if (!exists) {
-    return `错误：文件 ${filePath} 不存在`
-  }
-
-  const content = await file.text()
-
-  // 2. 检查 oldString 是否存在
-  if (!content.includes(oldString)) {
-    return `错误：在 ${filePath} 中找不到 oldString`
-  }
-
-  // 3. 检查是否有多处匹配（非 replaceAll 模式下报错）
-  // 这是为了防止意外改错地方——如果有多处匹配，LLM 应该提供更多上下文
-  if (!replaceAll) {
-    const firstIndex = content.indexOf(oldString)
-    const secondIndex = content.indexOf(oldString, firstIndex + 1)
-    if (secondIndex !== -1) {
-      return `错误：在 ${filePath} 中找到多处匹配，请提供更多上下文或使用 replaceAll`
+    // 1. 读文件（走服务，不存在返回 null）
+    const content = yield* Effect.promise(() => fs.read(filePath))
+    if (content === null) {
+      return `错误：文件 ${filePath} 不存在`
     }
-  }
 
-  // 4. 替换
-  // replaceAll: 用 split + join 替换所有（String.replaceAll 的兼容写法）
-  // 非 replaceAll: 用 replace 只替换第一个
-  const newContent = replaceAll
-    ? content.split(oldString).join(newString)
-    : content.replace(oldString, newString)
+    // 2. 检查 oldString 是否存在
+    if (!content.includes(oldString)) {
+      return `错误：在 ${filePath} 中找不到 oldString`
+    }
 
-  // 5. 写回文件
-  await Bun.write(filePath, newContent)
+    // 3. 检查是否有多处匹配（非 replaceAll 模式下报错）
+    // 这是为了防止意外改错地方——如果有多处匹配，LLM 应该提供更多上下文
+    if (!replaceAll) {
+      const firstIndex = content.indexOf(oldString)
+      const secondIndex = content.indexOf(oldString, firstIndex + 1)
+      if (secondIndex !== -1) {
+        return `错误：在 ${filePath} 中找到多处匹配，请提供更多上下文或使用 replaceAll`
+      }
+    }
 
-  return `已编辑 ${filePath}`
-}
+    // 4. 替换
+    // replaceAll: 用 split + join 替换所有（String.replaceAll 的兼容写法）
+    // 非 replaceAll: 用 replace 只替换第一个
+    const newContent = replaceAll
+      ? content.split(oldString).join(newString)
+      : content.replace(oldString, newString)
 
-export const editTool: Tool<typeof Parameters> = {
+    // 5. 写回文件（走服务）
+    yield* Effect.promise(() => fs.write(filePath, newContent))
+
+    return `已编辑 ${filePath}`
+  })
+
+export const editTool: Tool<typeof Parameters, FileSystemService> = {
   id: "edit",
   description: DESCRIPTION,
   parameters: Parameters,

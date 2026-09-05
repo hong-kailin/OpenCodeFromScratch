@@ -12,21 +12,37 @@
 //   execute(args: Schema.Schema.Type<Parameters>)
 //   LLM 看到的 JSON Schema 由 toJSONSchema() 从同一 Schema 自动生成（对照 opencode 的 json-schema.ts）
 //   运行期校验由 agent-loop 用 Schema.decodeUnknownEffect 完成（对照 opencode tool.ts 的 wrap）
+//
+// 阶段 16.3 改动：execute 从 Promise 升级为 Effect（对照 opencode 的真实签名）。
+// 之前：
+//   execute(args): Promise<string>          —— 工具直接调 Bun/file，拿不到 Context
+// 现在：
+//   execute(args): Effect.Effect<string>    —— 工具内部 yield* FileSystem.Service 取依赖
+// 为什么：阶段 16 把文件操作收进 FileSystem 服务，工具必须能"从 Context 取服务"。
+//   Promise 函数体内没有 Context，Effect 函数体里有（yield* 就是取服务的语法）。
+//   agent-loop 调用处也简化：不用再包一层 Effect.promise。
 
-import { Schema } from "effect"
+import { Effect, Schema } from "effect"
 
 // 一个工具的完整定义（泛型 Parameters：本工具的参数 Schema）
 // 对照 opencode 的 Def 接口，我们简化了：
 // - 去掉 Context（后续阶段加权限/abort 等）
-// - execute 返回 Promise<string>（opencode 返回 Effect<ExecuteResult>）
+// - execute 返回 Effect<string>（opencode 返回 Effect<ExecuteResult>，更复杂）
 // 关键点：parameters 既是"类型定义"又是"运行期校验器"——
 //   Schema.Schema.Type<Parameters> 推导出 execute 的 args 类型（编译期类型安全）
 //   Schema.decodeUnknownEffect(parameters) 是运行期校验（agent-loop 里调用）
-export interface Tool<Parameters extends Schema.Decoder<unknown> = Schema.Decoder<unknown>> {
+export interface Tool<
+  Parameters extends Schema.Decoder<unknown> = Schema.Decoder<unknown>,
+  R = never,
+> {
   id: string // 工具名（LLM 用这个名字调用，如 "read"）
   description: string // 工具说明（LLM 根据这个决定要不要用）
   parameters: Parameters // 参数格式（Effect Schema，单一来源）
-  execute(args: Schema.Schema.Type<Parameters>): Promise<string> // 执行函数，返回文本结果
+  // execute 返回 Effect<string>，第三泛型 R 是"这个工具需要哪些服务"
+  // 例如 read 工具需要 FileSystemService，所以它的 execute 类型是
+  // Effect.Effect<string, never, FileSystemService>——类型系统会强制
+  // "执行 read 时 Context 里必须有 FileSystemService"，否则编译报错
+  execute(args: Schema.Schema.Type<Parameters>): Effect.Effect<string, never, R> // 执行函数，返回文本结果
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -86,7 +102,7 @@ export function toJSONSchema(schema: Schema.Decoder<unknown>): Record<string, un
 // 把我们的 Tool 定义转成 OpenAI API 的 tools 格式
 // API 需要的格式：{ type: "function", function: { name, description, parameters } }
 // parameters 不再手写——用 toJSONSchema 从工具的 Schema 自动生成
-export function toolToOpenAIFormat(tool: Tool) {
+export function toolToOpenAIFormat(tool: Tool<any, any>) {
   return {
     type: "function" as const,
     function: {
