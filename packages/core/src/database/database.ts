@@ -95,21 +95,3 @@ export const databaseLayer = Layer.effect(
     })
   }),
 )
-
-// ── 兼容层：模块级 db 导出 ─────────────────────────────────
-// 阶段 16.2 的过渡写法（16.5 会移除）：
-// session.ts / message.ts 还是模块级函数，直接 import { db }。
-// 为了让它们暂时不用改，这里从 Database Service 里"取出" db 再导出。
-// 关键教学点：
-//   DatabaseService              -- tag，拿服务的钥匙
-//   .pipe(Effect.map(s => s.db)) -- 从服务实例取 db 属性（返回 Effect<db>）
-//   Effect.provide(..., databaseLayer) -- 喂入实现（这才触发建库）
-//   Effect.runSync               -- 同步执行（模块加载时跑一次）
-// 对比之前：副作用从"import 即建库"变成"provide 时建库"，这里显式 provide 了一次。
-// 16.5 session/message 服务化后，这个模块级导出会被删掉。
-export const db = Effect.runSync(
-  Effect.provide(
-    DatabaseService.pipe(Effect.map((service) => service.db)),
-    databaseLayer,
-  ),
-)

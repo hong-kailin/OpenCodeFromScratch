@@ -49,24 +49,20 @@ export {
 export {
   DatabaseService,
   databaseLayer,
-  db,
   sessionTable,
   messageTable,
 } from "./database/database"
 export {
   SessionStore,
   sessionStoreLayer,
-  createSession,
-  listSessions,
-  getSession,
-  updateSession,
-  saveMessage,
-  loadMessages,
 } from "./session/store"
 export type { Session } from "./session/store"
 
 // ── System Context ──────────────────────────────────────
-export { buildSystemPrompt } from "./system-context"
+export {
+  SystemContext,
+  systemContextLayer,
+} from "./system-context"
 
 // ── 错误类型 ────────────────────────────────────────────
 export { ConfigError, LLMError, ToolError } from "./error/errors"

@@ -17,18 +17,27 @@ import { createSignal, For, Show } from "solid-js"
 import type { TextareaRenderable } from "@opentui/core"
 import "opentui-spinner/solid"
 import { Effect, Layer } from "effect"
-import { buildSystemPrompt, configLayer, providerLayer, toolRegistryLayer, fileSystemLayer } from "@opencode-from-scratch/core"
+import {
+  configLayer,
+  providerLayer,
+  toolRegistryLayer,
+  fileSystemLayer,
+  systemContextLayer,
+  SystemContext,
+} from "@opencode-from-scratch/core"
 import { runAgentLoop } from "../agent-loop"
 import type { Message } from "@opencode-from-scratch/schema"
 
 // Layer 组装：和 CLI 入口一样，providerLayer 依赖 ConfigService
 // fileSystemLayer 也不能少——工具 execute 需要 FileSystem 服务（16.3）
+// systemContextLayer——system prompt 组装需要（16.6）
 const satisfiedProvider = providerLayer.pipe(Layer.provide(configLayer))
 const appLayers = Layer.mergeAll(
   configLayer,
   satisfiedProvider,
   toolRegistryLayer,
   fileSystemLayer,
+  systemContextLayer,
 )
 
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
@@ -59,40 +68,46 @@ function App() {
     setMessages((prev) => [...prev, { role: "user", content: text }])
 
     try {
-      const internalMessages: Message[] = [
-        { role: "system", content: buildSystemPrompt() },
-        { role: "user", content: text },
-      ]
-
-      // 跑 agent loop，provider 和 tools 从 Context 自取
-      // TUI 版不需要持久化，所以不传 onMessage
+      // 从 Context 取 SystemContext 服务，组装 system prompt（16.6）
+      // 整个提交逻辑包成 Effect：依赖从 Context 自取（provider/tools/SystemContext）
       await Effect.runPromise(
-        runAgentLoop(internalMessages, {
-          onChunk(chunk) {
-            setMessages((prev) => {
-              const last = prev[prev.length - 1]!
-              if (last.role !== "assistant") {
-                return [...prev, { role: "assistant", content: chunk }]
-              }
-              return [...prev.slice(0, -1), { ...last, content: last.content + chunk }]
-            })
-          },
-          onToolCall(id, name, args) {
-            setMessages((prev) => [
-              ...prev,
-              { role: "tool", content: "", toolName: name, toolArgs: args, toolStatus: "running" },
-            ])
-          },
-          onToolResult(id, output) {
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.role === "tool" && msg.toolStatus === "running"
-                  ? { ...msg, toolStatus: "completed", content: output }
-                  : msg,
-              ),
-            )
-          },
-          // TUI 版不传 onMessage——不需要持久化
+        Effect.gen(function* () {
+          const sysCtx = yield* SystemContext
+          const systemPromptContent = yield* sysCtx.build()
+          const internalMessages: Message[] = [
+            { role: "system", content: systemPromptContent },
+            { role: "user", content: text },
+          ]
+
+          // 跑 agent loop，provider 和 tools 从 Context 自取
+          // TUI 版不需要持久化，所以不传 onMessage
+          yield* runAgentLoop(internalMessages, {
+            onChunk(chunk) {
+              setMessages((prev) => {
+                const last = prev[prev.length - 1]!
+                if (last.role !== "assistant") {
+                  return [...prev, { role: "assistant", content: chunk }]
+                }
+                return [...prev.slice(0, -1), { ...last, content: last.content + chunk }]
+              })
+            },
+            onToolCall(id, name, args) {
+              setMessages((prev) => [
+                ...prev,
+                { role: "tool", content: "", toolName: name, toolArgs: args, toolStatus: "running" },
+              ])
+            },
+            onToolResult(id, output) {
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.role === "tool" && msg.toolStatus === "running"
+                    ? { ...msg, toolStatus: "completed", content: output }
+                    : msg,
+                ),
+              )
+            },
+            // TUI 版不传 onMessage——不需要持久化
+          })
         }).pipe(Effect.provide(appLayers)),
       )
     } catch (err) {

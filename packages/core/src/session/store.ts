@@ -23,7 +23,7 @@
 import { Context, Effect, Layer } from "effect"
 import { eq, desc, asc } from "drizzle-orm"
 import type { Message, ToolCall } from "@opencode-from-scratch/schema"
-import { DatabaseService, databaseLayer } from "../database/database"
+import { DatabaseService } from "../database/database"
 import { sessionTable, messageTable } from "../database/sql"
 
 // ── Session 类型 ──────────────────────────────────────────
@@ -163,40 +163,3 @@ export const sessionStoreLayer = Layer.effect(
   }),
 )
 
-// ── 兼容层：模块级函数导出 ────────────────────────────────
-// 阶段 16.5 的过渡写法（16.6 上层接入时会替换）：
-// index.ts 现在调用的是模块级 createSession() 等函数。
-// 为了让中间态不坏，这里保留同名导出，内部从 SessionStore 服务"取出"实现再转成 async。
-// 16.6 上层接入时，index.ts 会改成 yield* SessionStore，这些兼容导出会被删掉。
-// 注意：这些模块级函数在模块加载时执行一次 Effect.runSync 拿服务实例（和 db 兼容层同思路）
-
-const storeInstance = Effect.runSync(
-  Effect.provide(
-    SessionStore,
-    sessionStoreLayer.pipe(Layer.provide(databaseLayer)),
-  ),
-)
-
-export async function createSession(title?: string): Promise<Session> {
-  return await Effect.runPromise(storeInstance.create(title))
-}
-
-export async function listSessions(): Promise<Session[]> {
-  return await Effect.runPromise(storeInstance.list())
-}
-
-export async function getSession(id: string): Promise<Session | undefined> {
-  return await Effect.runPromise(storeInstance.get(id))
-}
-
-export async function updateSession(id: string, title: string): Promise<void> {
-  await Effect.runPromise(storeInstance.update(id, title))
-}
-
-export async function saveMessage(sessionId: string, msg: Message): Promise<void> {
-  await Effect.runPromise(storeInstance.saveMessage(sessionId, msg))
-}
-
-export async function loadMessages(sessionId: string): Promise<Message[]> {
-  return await Effect.runPromise(storeInstance.loadMessages(sessionId))
-}
