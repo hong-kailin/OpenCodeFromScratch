@@ -691,9 +691,14 @@ opencode-from-scratch/
 >   - 依赖 Database Service，对照 opencode `core/src/session/store.ts`
 >   - 产出：`core/src/session/store.ts`，CLI/TUI 通过服务访问存储
 >
-> - **16.6 SystemContext 服务 + 上层接入 + 验收**
->   - SystemContext Service：buildSystemPrompt 封装成服务
->   - CLI/TUI 入口改成从 core 包导入所有服务，opencode 包瘦身
+> - **16.6 SystemContext 服务：组装 system prompt**
+>   - system-context.ts 从模块级函数改为 SystemContext Service
+>   - 对照 opencode `core/src/system-context/`（registry 模式，我们简化）
+>   - 产出：`core/src/system-context.ts`
+>
+> - **16.7 上层接入 + 验收**
+>   - CLI/TUI 入口改成从 core 包导入所有服务（yield* SessionStore / SystemContext）
+>   - 删除所有兼容层（模块级 buildSystemPrompt / createSession / db 导出）
 >   - 验收：typecheck 通过、CLI/TUI 跑通、功能与阶段 15 一致
 >   - 工程思维：服务化的价值——可替换实现、测试时 mock、边界清晰
 >
