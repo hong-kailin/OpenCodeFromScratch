@@ -53,9 +53,17 @@ export {
   sessionTable,
   messageTable,
 } from "./database/database"
-export { createSession, listSessions, getSession, updateSession } from "./session/session"
-export type { Session } from "./session/session"
-export { saveMessage, loadMessages } from "./session/message"
+export {
+  SessionStore,
+  sessionStoreLayer,
+  createSession,
+  listSessions,
+  getSession,
+  updateSession,
+  saveMessage,
+  loadMessages,
+} from "./session/store"
+export type { Session } from "./session/store"
 
 // ── System Context ──────────────────────────────────────
 export { buildSystemPrompt } from "./system-context"
