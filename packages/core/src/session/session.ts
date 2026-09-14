@@ -4,7 +4,7 @@
 // opencode 的 session 管理远比这复杂（事件溯源、project/workspace 分层、25+ 字段）
 // 我们简化为直接 CRUD，后续阶段逐步补全
 
-import { db, sessionTable } from "./db"
+import { db, sessionTable } from "../database/database"
 import { eq, desc } from "drizzle-orm"
 
 // Session 类型：对应数据库里的一行

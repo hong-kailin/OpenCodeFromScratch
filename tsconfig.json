@@ -7,7 +7,8 @@
     "types": ["bun"],
     "paths": {
       "@/*": ["./packages/opencode/src/*"],
-      "@opencode-from-scratch/schema": ["./packages/schema/src/index.ts"]
+      "@opencode-from-scratch/schema": ["./packages/schema/src/index.ts"],
+      "@opencode-from-scratch/core": ["./packages/core/src/index.ts"]
     },
     "jsx": "preserve",
     "jsxImportSource": "@opentui/solid"

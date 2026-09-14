@@ -15,13 +15,13 @@
 // 对比 providerLayer（需要 yield* ConfigService），这里的依赖更简单。
 
 import { Context, Effect, Layer } from "effect"
-import type { Tool } from "../tool/tool"
-import { readTool } from "../tool/read"
-import { writeTool } from "../tool/write"
-import { editTool } from "../tool/edit"
-import { bashTool } from "../tool/bash"
-import { globTool } from "../tool/glob"
-import { grepTool } from "../tool/grep"
+import type { Tool } from "./tool"
+import { readTool } from "./read"
+import { writeTool } from "./write"
+import { editTool } from "./edit"
+import { bashTool } from "./bash"
+import { globTool } from "./glob"
+import { grepTool } from "./grep"
 
 // ── 1. ToolRegistryApi：声明能力 ────────────────────────────
 // 只有一个能力：list()，返回当前注册的所有工具
