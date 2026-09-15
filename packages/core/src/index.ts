@@ -38,6 +38,13 @@ export { globTool } from "./tool/glob"
 export { grepTool } from "./tool/grep"
 export { truncate } from "./tool/truncate"
 
+// ── Filesystem 服务（16.3）────────────────────────────────
+export {
+  FileSystemService,
+  fileSystemLayer,
+  type FileSystemApi,
+} from "./filesystem"
+
 // ── 数据库与存储（阶段 5 起的模块级版本，16.2 起逐个服务化）─
 export {
   DatabaseService,
