@@ -57,8 +57,11 @@ export {
   type Session,
 } from "./session/store"
 
-// ── System Context（阶段 7 起的模块级版本）─────────────────
-export { buildSystemPrompt } from "./system-context"
+// ── System Context（16.7 服务化）────────────────────────────
+export {
+  SystemContext,
+  systemContextLayer,
+} from "./system-context"
 
 // ── 错误类型 ────────────────────────────────────────────
 export { ConfigError, LLMError, ToolError } from "./error/errors"

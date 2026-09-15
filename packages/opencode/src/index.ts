@@ -26,7 +26,6 @@ import { hideBin } from "yargs/helpers"
 import { Effect, Layer } from "effect"
 import type { Message } from "@opencode-from-scratch/schema"
 import {
-  buildSystemPrompt,
   debug,
   debugMessages,
   configLayer,
@@ -35,6 +34,7 @@ import {
   fileSystemLayer,
   databaseLayer,
   sessionStoreLayer,
+  systemContextLayer,
   readToolLayer,
   writeToolLayer,
   editToolLayer,
@@ -42,6 +42,7 @@ import {
   globToolLayer,
   grepToolLayer,
   SessionStore,
+  SystemContext,
 } from "@opencode-from-scratch/core"
 import { runAgentLoop } from "./agent-loop"
 
@@ -74,6 +75,7 @@ const appLayers = Layer.mergeAll(
   toolRegistryLayer,
   fileSystemLayer,
   satisfiedSessionStore,
+  systemContextLayer,
   toolsLayer,
 )
 
@@ -105,13 +107,15 @@ yargs(hideBin(process.argv))
       // 整个 handler 变成一个 Effect：所有依赖从 Context 自取
       // 16.6 关键改动：不再调模块级函数，改为 yield* 服务
       const program = Effect.fn("runCommand")(function* () {
-        // 从 Context 取存储服务（16.6）
+        // 从 Context 取存储服务（16.6）+ SystemContext 服务（16.7）
         const store = yield* SessionStore
+        const sysCtx = yield* SystemContext
 
         // 1. system prompt（不存数据库，每次启动重新生成）
+        const systemPromptContent = yield* sysCtx.build()
         const systemPrompt: Message = {
           role: "system",
-          content: buildSystemPrompt(),
+          content: systemPromptContent,
         }
 
         // 2. 调试模式（VSCode Debug Console 不支持 stdin）

@@ -18,17 +18,18 @@ import type { TextareaRenderable } from "@opentui/core"
 import "opentui-spinner/solid"
 import { Effect, Layer } from "effect"
 import {
-  buildSystemPrompt,
   configLayer,
   providerLayer,
   toolRegistryLayer,
   fileSystemLayer,
+  systemContextLayer,
   readToolLayer,
   writeToolLayer,
   editToolLayer,
   bashToolLayer,
   globToolLayer,
   grepToolLayer,
+  SystemContext,
 } from "@opencode-from-scratch/core"
 import { runAgentLoop } from "../agent-loop"
 import type { Message } from "@opencode-from-scratch/schema"
@@ -51,6 +52,7 @@ const appLayers = Layer.mergeAll(
   satisfiedProvider,
   toolRegistryLayer,
   fileSystemLayer,
+  systemContextLayer,
   toolsLayer,
 )
 
@@ -82,40 +84,48 @@ function App() {
     setMessages((prev) => [...prev, { role: "user", content: text }])
 
     try {
-      const internalMessages: Message[] = [
-        { role: "system", content: buildSystemPrompt() },
-        { role: "user", content: text },
-      ]
-
-      // 跑 agent loop，provider 和 tools 从 Context 自取
-      // TUI 版不需要持久化，所以不传 onMessage
+      // 整个提交逻辑包成 Effect：依赖从 Context 自取
+      // （SystemContext 组装 prompt，runAgentLoop 的 provider/tools/fs）
       await Effect.runPromise(
-        runAgentLoop(internalMessages, {
-          onChunk(chunk) {
-            setMessages((prev) => {
-              const last = prev[prev.length - 1]!
-              if (last.role !== "assistant") {
-                return [...prev, { role: "assistant", content: chunk }]
-              }
-              return [...prev.slice(0, -1), { ...last, content: last.content + chunk }]
-            })
-          },
-          onToolCall(id, name, args) {
-            setMessages((prev) => [
-              ...prev,
-              { role: "tool", content: "", toolName: name, toolArgs: args, toolStatus: "running" },
-            ])
-          },
-          onToolResult(id, output) {
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.role === "tool" && msg.toolStatus === "running"
-                  ? { ...msg, toolStatus: "completed", content: output }
-                  : msg,
-              ),
-            )
-          },
-          // TUI 版不传 onMessage——不需要持久化
+        Effect.gen(function* () {
+          // 从 Context 取 SystemContext 服务，组装 system prompt（16.7）
+          const sysCtx = yield* SystemContext
+          const systemPromptContent = yield* sysCtx.build()
+
+          const internalMessages: Message[] = [
+            { role: "system", content: systemPromptContent },
+            { role: "user", content: text },
+          ]
+
+          // 跑 agent loop，provider 和 tools 从 Context 自取
+          // TUI 版不需要持久化，所以不传 onMessage
+          yield* runAgentLoop(internalMessages, {
+            onChunk(chunk) {
+              setMessages((prev) => {
+                const last = prev[prev.length - 1]!
+                if (last.role !== "assistant") {
+                  return [...prev, { role: "assistant", content: chunk }]
+                }
+                return [...prev.slice(0, -1), { ...last, content: last.content + chunk }]
+              })
+            },
+            onToolCall(id, name, args) {
+              setMessages((prev) => [
+                ...prev,
+                { role: "tool", content: "", toolName: name, toolArgs: args, toolStatus: "running" },
+              ])
+            },
+            onToolResult(id, output) {
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.role === "tool" && msg.toolStatus === "running"
+                    ? { ...msg, toolStatus: "completed", content: output }
+                    : msg,
+                ),
+              )
+            },
+            // TUI 版不传 onMessage——不需要持久化
+          })
         }).pipe(Effect.provide(appLayers)),
       )
     } catch (err) {

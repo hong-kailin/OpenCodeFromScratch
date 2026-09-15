@@ -8,7 +8,7 @@
   ],
   "scripts": {
     "dev": "bun run packages/opencode/src/index.ts",
-    "tui": "bun run packages/opencode/src/tui/hello.tsx",
+    "tui": "bun run packages/opencode/src/tui/agent.tsx",
     "tui:debug": "bun --inspect=ws://localhost:6499/debug packages/opencode/src/tui/agent.tsx",
     "typecheck": "tsc --noEmit"
   },
