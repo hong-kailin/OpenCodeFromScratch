@@ -10,7 +10,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![Effect](https://img.shields.io/badge/Effect--TS-v4%20beta-b026ff)](https://effect.website)
 [![参考版本](https://img.shields.io/badge/opencode-v1.17.13-2088ff)](https://github.com/anomalyco/opencode)
-[![进度](https://img.shields.io/badge/进度-阶段%2010%20/%2021-f5a623)](./COURSE.md)
+[![进度](https://img.shields.io/badge/进度-阶段%2016%20/%2025-f5a623)](./COURSE.md)
 
 [项目由来](#-为什么有这个项目) · [学习路线](#️-学习路线) · [快速开始](#-快速开始) · [课程文档](./COURSE.md)
 
@@ -99,18 +99,22 @@ AI 时代，一句"帮我写个 XXX"就能产出能跑的代码。但很快你�
 
 | 阶段 | 解决的痛点 | 引入的抽象 | 状态 |
 |:---:|---|---|:---:|
-| 10 | 依赖到处传 | Effect Service / Layer / Stream / Schema | 🔧 |
-| 11 | 类型重复、边界模糊 | Schema 契约层 + Bun workspaces | ⏳ |
-| 12 | 领域逻辑散乱 | Core 领域服务化 | ⏳ |
-| 13 | 无法 revert / 恢复 / 压缩 | Session 事件溯源 | ⏳ |
-| 14 | 加 provider 要复制粘贴 | LLM Route 四轴模型 | ⏳ |
-| 15 | TUI 与 agent 耦合 | Server + Protocol + Client | ⏳ |
-| 16 | 工具能乱改无确认 | Permission 系统 | ⏳ |
-| 17 | 单 agent 干所有事 | Agent 定义 + Subagent | ⏳ |
-| 18 | 工具不够用 | 完整工具集 | ⏳ |
-| 19 | 工具扩展要改源码 | MCP 支持 | ⏳ |
-| 20 | 长对话爆上下文 | Compaction + revert + plugin + LSP | ⏳ |
-| 21 | 只有 TUI | Web UI + Desktop | ⏳ |
+| 10 | 依赖到处传 | Effect 基础（延迟的计算描述） | ✅ |
+| 11 | 依赖到处传 | Service + Layer（依赖注入） | ✅ |
+| 12 | 依赖到处传 | 用 Effect 重构 agent loop | ✅ |
+| 13 | 类型校验缺失、错误模糊 | Effect Schema + Typed Errors | ✅ |
+| 14 | ReadableStream 不可组合 | Effect Stream（流式重写） | ✅ |
+| 15 | 类型重复、边界模糊 | Monorepo 拆分 + Schema 契约层 | ✅ |
+| 16 | 领域逻辑散乱 | Core 领域服务化 | ✅ |
+| 17 | 无法 revert / 恢复 / 压缩 | Session 事件溯源 | ⏳ |
+| 18 | 加 provider 要复制粘贴 | LLM Route 四轴模型 | ⏳ |
+| 19 | TUI 与 agent 耦合 | Server + Protocol + Client | ⏳ |
+| 20 | 工具能乱改无确认 | Permission 系统 | ⏳ |
+| 21 | 单 agent 干所有事 | Agent 定义 + Subagent | ⏳ |
+| 22 | 工具不够用 | 完整工具集 | ⏳ |
+| 23 | 工具扩展要改源码 | MCP 支持 | ⏳ |
+| 24 | 长对话爆上下文 | Compaction + revert + plugin + LSP | ⏳ |
+| 25 | 只有 TUI | Web UI + Desktop | ⏳ |
 
 > 完整课程大纲与当前进度见 **[COURSE.md](./COURSE.md)**（活文档，进入每阶段前才细化）。
 
@@ -173,19 +177,15 @@ bun run tui            # TUI 终端界面
 
 ```
 OpenCodeFromScratch/
-├── opencode/          # opencode 源码（只读参考，不修改）
-├── docs/              # 课程文档（按 阶段 / 小课 编号组织）
-├── src/               # 项目代码
-│   ├── index.ts       # CLI 入口
-│   ├── agent-loop.ts  # agent loop 核心逻辑
-│   ├── provider/      # LLM Provider（OpenAI / Anthropic）
-│   ├── tool/          # 工具实现（read / write / edit / bash / grep / glob）
-│   ├── service/       # Effect Service（ConfigService 等）
-│   ├── tui/           # 终端 UI（opentui / solid）
-│   └── ...
-├── COURSE.md          # 课程大纲（活文档）
-├── AGENTS.md          # 项目约定与 AI 助手指令
-└── README.md          # 你正在看的这个
+├── opencode/              # opencode 源码（只读参考，不修改）
+├── docs/                  # 课程文档（按 阶段 / 小课 编号组织）
+├── packages/
+│   ├── schema/            # 契约层：共享类型（Effect Schema）
+│   ├── core/              # 领域层：7 个 Effect Service + 工具 + 数据库
+│   └── opencode/          # 入口层：agent-loop + CLI + TUI
+├── COURSE.md              # 课程大纲（活文档）
+├── AGENTS.md              # 项目约定与 AI 助手指令
+└── README.md              # 你正在看的这个
 ```
 
 ---

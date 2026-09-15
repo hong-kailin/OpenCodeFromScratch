@@ -659,6 +659,22 @@ opencode-from-scratch/
 > - 对照 opencode：`packages/core/src/` 的领域文件 + 同名子目录结构
 >
 > **产出**：`packages/{schema, core, opencode}` 三层结构，agent 通过 Context 取用 core 服务。
+>
+> **课程**（已完成，文档见 `docs/16-core-services/`）：
+>
+> - **16.0 总览：为什么需要领域服务化**——模块级单例的硬伤（import 即副作用 / 无法替换 / 无服务边界），8 步路线
+> - **16.1 建 core 包（纯搬移）**——git mv 26 个领域文件进 `packages/core`，三层结构成立，逻辑不动；顺手修了 bunfig preload 路径 bug（@opentui 装进子包 node_modules）
+> - **16.2 Database 服务**——拆出 `sql.ts`（表结构独立），`database.ts` 改成三件套，建库副作用收进 Layer；用模块级桥接让 session/message 暂时不破（16.6 移除）
+> - **16.3 FileSystem 服务**——read/exists/write/glob/grep 五个方法收口，跳过规则集中管理；demo 演示"换 mock 消费方零改动"（依赖注入价值）
+> - **16.4 工具 Effect 化**——execute 从 `Promise<string>` 变 `Effect<string>`，Tool 接口加第三泛型 R（声明工具需要的服务）；agent-loop 用 `provideService` 注入 + 断言 R=never（防 any 污染）；补讲 `Effect<A,E,R>` 三参数与 never 含义
+> - **16.5 ToolRegistry 去中心化注册**——注册表空启动 + register/list/get，每工具一个自注册 Layer（`Layer.effectDiscard`）；加工具只改入口一处（opencode 模式）
+> - **16.6 SessionStore 服务**——session + message 合并成一个服务（6 个方法全 Effect 化），依赖 Database；退役 16.2 过渡桥接（技术债清零）
+> - **16.7 SystemContext 服务**——`buildSystemPrompt` 模块级函数升级为 Service，CLI/TUI 改 `yield* SystemContext`
+> - **16.8 上层接入 + 验收**——无兼容层残留、全量回归、三层结构、阶段 16 工程思维总结
+>
+> **阶段 16 附加修复**（验收时发现）：
+> - `Effect.promise` 会把 reject 的 Error 当 defect（die）而非 failure，mapError 不生效直接穿透——改用 `Effect.tryPromise` 的 catch 显式转 failure（LLMError）
+> - LLM 调用失败统一走 LLMError + CLI 优雅兜底，不再 unhandled rejection
 
 ### 阶段 17：Session 事件溯源
 
@@ -840,13 +856,13 @@ opencode-from-scratch/
 - [x] 阶段 7：System Context & AGENTS.md
 - [x] 阶段 8：CLI 入口
 - [x] 阶段 9：TUI 终端界面
-- [ ] 阶段 10：Effect 基础（延迟的计算描述）
-- [ ] 阶段 11：Service + Layer（依赖注入）
-- [ ] 阶段 12：用 Effect 重构 agent loop
-- [ ] 阶段 13：Effect Schema + Typed Errors
-- [ ] 阶段 14：Effect Stream（流式重写）
-- [ ] 阶段 15：Monorepo 拆分 + Schema 契约层
-- [ ] 阶段 16：Core 领域服务化
+- [x] 阶段 10：Effect 基础（延迟的计算描述）
+- [x] 阶段 11：Service + Layer（依赖注入）
+- [x] 阶段 12：用 Effect 重构 agent loop
+- [x] 阶段 13：Effect Schema + Typed Errors
+- [x] 阶段 14：Effect Stream（流式重写）
+- [x] 阶段 15：Monorepo 拆分 + Schema 契约层
+- [x] 阶段 16：Core 领域服务化
 - [ ] 阶段 17：Session 事件溯源
 - [ ] 阶段 18：LLM Route 四轴模型
 - [ ] 阶段 19：Server + Protocol + Client
@@ -857,4 +873,4 @@ opencode-from-scratch/
 - [ ] 阶段 24：Compaction + 高级特性
 - [ ] 阶段 25：Web UI + Desktop
 
-> **下一步**：进入阶段 10 前先细化具体课程内容。阶段 10-14 拆分自原阶段 10，将 Effect 的核心概念（基础/Schema/Stream/Service+Layer）拆成独立阶段，每个聚焦一个主题。
+> **下一步**：阶段 0-16 已完成（三层 monorepo + core 7 个服务，agent loop 跑通）。阶段 17 把 session 持久化从"直接 CRUD"重构成"事件溯源 + 投影"——这是 opencode 最精巧的设计之一，也是 Effect Stream + Service 的最佳实践场。进入阶段 17 前先细化其课程内容。
