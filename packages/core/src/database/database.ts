@@ -1,76 +1,115 @@
-// src/db.ts
-// 数据库初始化：创建 SQLite 文件 + Drizzle ORM + 表结构
-// 对照 opencode: packages/core/src/database/database.ts 和 session/sql.ts
-// opencode 的表结构复杂得多（25+ 字段的 session 表、message + part 两表、事件溯源等）
+// packages/core/src/database/database.ts
+// 阶段 16.2 教学代码：Database Service——模块级单例 → Effect Service
+//
+// 之前（阶段 5-15）：db.ts 是模块级单例
+//   import 这个模块的瞬间就建库（new Database + PRAGMA + CREATE TABLE）
+//   问题：
+//   1. import 即建库——谁 import 谁触发副作用，测试时无法替换
+//   2. db 是模块级 export——所有地方直接 import { db }，无法 mock
+//   3. 建库时机不可控——无法在"需要时"才建（如测试用 :memory:）
+//
+// 现在（阶段 16.2）：Database Service（Service 三件套，阶段 11 学的模式）
+//   1. Interface      -- 声明这个服务能做什么：暴露一个 db 实例
+//   2. Service        -- tag（唯一标识）
+//   3. databaseLayer  -- Layer：provide 时才建库（把副作用收进 Layer）
+//   消费方 yield* DatabaseService 拿 db，测试时可以换成别的 Layer
+//
+// 对照 opencode: packages/core/src/database/database.ts
+//   opencode 用 effect-drizzle-sqlite 包装，且支持内存库/文件库切换（layerFromPath）；
+//   我们简化：直接用 bun:sqlite + drizzle，建库逻辑收进 Layer。
+//   opencode 还开了一串 PRAGMA（synchronous/busy_timeout/foreign_keys 等），
+//   我们只留 WAL。
 
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core"
+import { Context, Effect, Layer } from "effect"
 import { drizzle } from "drizzle-orm/bun-sqlite"
 import { Database } from "bun:sqlite"
+import { sessionTable, messageTable } from "./sql"
 
-// ── 表结构定义 ──────────────────────────────────────────────
-// 用 Drizzle 定义表结构，类比 Python SQLAlchemy 的 declarative_base
+// ── 1. Interface：声明能力 ─────────────────────────────────
+// 这个服务只有一个能力：暴露 Drizzle 的 db 实例
+// db 的类型由 drizzle() 的返回值推导（带 schema 的类型安全查询）
+// 类比 Python: 一个类暴露 self.db（SQLAlchemy session）
+export interface DatabaseServiceApi {
+  readonly db: ReturnType<typeof drizzle>
+}
 
-// session 表：一次对话会话的元信息
-// 对照 opencode: 它的 SessionTable 有 25+ 字段（cost、tokens、agent、model 等）
-// 我们简化为 4 个字段，后续阶段逐步补全
-export const sessionTable = sqliteTable("session", {
-  id: text("id").primaryKey(),
-  title: text("title").notNull(),
-  time_created: integer("time_created").notNull(),
-  time_updated: integer("time_updated").notNull(),
-})
+// ── 2. Service：tag ────────────────────────────────────────
+// 固定模板，和 ConfigService/ProviderService 一样
+export class DatabaseService extends Context.Service<DatabaseService, DatabaseServiceApi>()(
+  "opencode-from-scratch/Database",
+) {}
 
-// message 表：对话消息
-// 对照 opencode: 它把消息拆成 message（消息头）+ part（消息内容片段）两表
-// 我们简化为单表——一条消息一行
-// tool_calls 存为 JSON 字符串（SQLite 没有原生 JSON 类型）
-export const messageTable = sqliteTable("message", {
-  id: text("id").primaryKey(),
-  session_id: text("session_id").notNull(), // 所属会话
-  role: text("role").notNull(), // system/user/assistant/tool
-  content: text("content"), // 消息内容（tool 消息是工具结果）
-  tool_calls: text("tool_calls"), // 工具调用（JSON 字符串，只有 assistant 有）
-  tool_call_id: text("tool_call_id"), // 工具调用 ID（只有 tool 消息有）
-  time_created: integer("time_created").notNull(),
-})
+// ── 3. databaseLayer：provide 时才建库 ─────────────────────
+// 关键：建库副作用（new Database + PRAGMA + CREATE TABLE）全部收进 Layer 函数体
+// 只有 Effect.provide(databaseLayer) 时才执行——"按需建库，而不是 import 即建库"
+// 测试时想用内存库，写另一个 Layer 替换即可（16.2 验收会演示）
+export const databaseLayer = Layer.effect(
+  DatabaseService,
+  Effect.gen(function* () {
+    // 数据库文件路径（对照 opencode: ~/.local/share/opencode/opencode.db）
+    // 之后可以做成可配置（从 ConfigService 读），现在先固定
+    const DB_PATH = "opencode-from-scratch.db"
 
-// ── 数据库初始化 ──────────────────────────────────────────────
+    // 创建 SQLite 数据库（bun:sqlite 内置，不需要额外安装）
+    const sqlite = new Database(DB_PATH)
 
-// 数据库文件路径（对照 opencode: ~/.local/share/opencode/opencode.db）
-const DB_PATH = "opencode-from-scratch.db"
+    // 开启 WAL 模式提升并发读写（opencode 也开了这个）
+    sqlite.run("PRAGMA journal_mode = WAL")
 
-// 创建 SQLite 数据库（bun:sqlite 内置，不需要额外安装）
-const sqlite = new Database(DB_PATH)
+    // 用 Drizzle 包装 SQLite
+    // schema 参数让 Drizzle 知道表结构，后续查询能返回类型安全的结果
+    const db = drizzle(sqlite, {
+      schema: { sessionTable, messageTable },
+    })
 
-// 开启 WAL 模式提升并发读写（opencode 也开了这个）
-sqlite.run("PRAGMA journal_mode = WAL")
+    // 创建表（如果不存在）
+    // 对照 opencode: 它用 drizzle-kit 的 migration 系统管理表结构
+    // 我们简化版直接 CREATE TABLE IF NOT EXISTS
+    sqlite.run(`
+      CREATE TABLE IF NOT EXISTS session (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        time_created INTEGER NOT NULL,
+        time_updated INTEGER NOT NULL
+      )
+    `)
 
-// 用 Drizzle 包装 SQLite
-// schema 参数让 Drizzle 知道表结构，后续查询能返回类型安全的结果
-export const db = drizzle(sqlite, {
-  schema: { sessionTable, messageTable },
-})
+    sqlite.run(`
+      CREATE TABLE IF NOT EXISTS message (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        role TEXT NOT NULL,
+        content TEXT,
+        tool_calls TEXT,
+        tool_call_id TEXT,
+        time_created INTEGER NOT NULL
+      )
+    `)
 
-// 创建表（如果不存在）
-// 对照 opencode: 它用 drizzle-kit 的 migration 系统管理表结构
-// 我们简化版直接 CREATE TABLE IF NOT EXISTS
-sqlite.run(`
-  CREATE TABLE IF NOT EXISTS session (
-    id TEXT PRIMARY KEY,
-    title TEXT NOT NULL,
-    time_created INTEGER NOT NULL,
-    time_updated INTEGER NOT NULL
-  )
-`)
+    // DatabaseService.of(...) 把实现包装成服务实例
+    // 只暴露 db——上层（session/message/后续服务）通过它做类型安全的查询
+    return DatabaseService.of({
+      db,
+    })
+  }),
+)
 
-sqlite.run(`
-  CREATE TABLE IF NOT EXISTS message (
-    id TEXT PRIMARY KEY,
-    session_id TEXT NOT NULL,
-    role TEXT NOT NULL,
-    content TEXT,
-    tool_calls TEXT,
-    tool_call_id TEXT,
-    time_created INTEGER NOT NULL
-  )
-`)
+// ── 过渡桥接：模块级 db 导出 ───────────────────────────────
+// 为什么需要它：
+//   session.ts / message.ts 还是模块级函数（16.6 才合并成 SessionStore 服务），
+//   模块级 async 函数没有 Context，无法 yield* DatabaseService 拿 db。
+//   所以这里从 Service 里"取出"db 再导出，让旧消费者 import { db } 继续工作。
+// 关键教学点（怎么把 Service 实例取出来）：
+//   DatabaseService              -- tag，拿服务的"钥匙"
+//   .pipe(Effect.map(s => s.db)) -- 从服务实例取 db 属性（得到 Effect<db>）
+//   Effect.provide(..., databaseLayer) -- 喂入实现（这里才触发建库）
+//   Effect.runSync               -- 同步执行（模块加载时跑一次）
+// 注意：这仍是"模块加载即建库"，但它只是【过渡】——真正消费 db 的新代码
+// （后续的 Effect 服务）会 yield* DatabaseService + provide 自定义 Layer，
+// 完全绕开这个桥接。16.6 SessionStore 服务化后会删掉这里。
+export const db = Effect.runSync(
+  Effect.provide(
+    DatabaseService.pipe(Effect.map((service) => service.db)),
+    databaseLayer,
+  ),
+)

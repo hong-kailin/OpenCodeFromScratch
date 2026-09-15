@@ -4,7 +4,8 @@
 // opencode 把消息拆成 message（容器）+ part（内容片段）两表，有 12 种 part 类型
 // 我们简化为单表：一条消息一行，tool_calls 存为 JSON 字符串
 
-import { db, messageTable } from "../database/database"
+import { db } from "../database/database"
+import { messageTable } from "../database/sql"
 import { eq, asc } from "drizzle-orm"
 import type { Message, ToolCall } from "@opencode-from-scratch/schema"
 

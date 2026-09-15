@@ -39,7 +39,12 @@ export { grepTool } from "./tool/grep"
 export { truncate } from "./tool/truncate"
 
 // ── 数据库与存储（阶段 5 起的模块级版本，16.2 起逐个服务化）─
-export { db, sessionTable, messageTable } from "./database/database"
+export {
+  DatabaseService,
+  databaseLayer,
+  db, // 过渡桥接：16.6 SessionStore 服务化后移除
+} from "./database/database"
+export { sessionTable, messageTable } from "./database/sql"
 export type { Session } from "./session/session"
 export {
   createSession,
