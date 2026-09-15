@@ -15,6 +15,7 @@ import type { Provider, ChatResult } from "./interface"
 import type { Message, ToolCall } from "@opencode-from-scratch/schema"
 import type { Tool } from "../tool/tool"
 import { toolToOpenAIFormat } from "../tool/tool"
+import { LLMError } from "../error/errors"
 import { debug } from "../debug"
 
 // 创建 OpenAI 兼容 Provider
@@ -61,14 +62,16 @@ export function createOpenAIProvider(config: {
         const errorText = await response.text()
         debug(`API 错误: ${response.status} ${response.statusText}`)
         debug(`  响应体: ${errorText}`)
-        throw new Error(`API 错误 ${response.status}: ${errorText}`)
+        // 用 LLMError（typed error，阶段 13）——调用方能 catchTag("LLMError") 精确捕获
+        // 之前是 throw new Error("字符串")，无法精确区分错误类型
+        throw new LLMError({ message: `API 错误 ${response.status}: ${errorText}` })
       }
 
       debug(`API 响应: ${response.status} ${response.statusText}`)
       debug("开始接收 SSE 流式数据...")
 
       if (!response.body) {
-        throw new Error("API 响应没有 body")
+        throw new LLMError({ message: "API 响应没有 body" })
       }
 
       const decoder = new TextDecoder()
@@ -92,7 +95,7 @@ export function createOpenAIProvider(config: {
       // 每步只做一件事，可独立复用/测试，这是命令式 for 循环做不到的。
       const sseDeltaStream = Stream.fromAsyncIterable(
         response.body,
-        (cause) => new Error(`读取流失败: ${String(cause)}`),
+        (cause) => new LLMError({ message: `读取流失败: ${String(cause)}` }),
       ).pipe(
         Stream.map((chunk) => decoder.decode(chunk, { stream: true })), // 字节 → 文本
         Stream.flatMap((text) => Stream.fromIterable(text.split("\n"))), // 文本 → 行

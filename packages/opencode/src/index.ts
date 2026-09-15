@@ -43,6 +43,7 @@ import {
   grepToolLayer,
   SessionStore,
   SystemContext,
+  LLMError,
 } from "@opencode-from-scratch/core"
 import { runAgentLoop } from "./agent-loop"
 
@@ -247,7 +248,18 @@ yargs(hideBin(process.argv))
 
       // 提供所有 Layer 后跑起来
       // 注意：program 是 Effect.fn 返回的"函数"，调用 program() 才得到 Effect
-      void Effect.runPromise(program().pipe(Effect.provide(appLayers)))
+      // 问题 1 修复：LLM 调用失败（LLMError）不再 unhandled rejection——
+      // 用 runPromise 返回的 promise 的 .catch 统一兜底，打印清晰错误后退出
+      Effect.runPromise(program().pipe(Effect.provide(appLayers))).catch((err) => {
+        const error = err as Error
+        if (error instanceof LLMError) {
+          console.error(`\n⚠️  LLM 调用失败: ${error.message}`)
+          console.error("   请检查网络、API key 和模型配置（opencode.json）")
+        } else {
+          console.error(`\n发生错误: ${error.message || String(err)}`)
+        }
+        process.exit(1)
+      })
     },
   )
   .demandCommand(1, "请指定命令，用 --help 查看可用命令")

@@ -26,6 +26,7 @@ import {
   ProviderService,
   ToolRegistry,
   FileSystemService,
+  LLMError,
   ToolError,
 } from "@opencode-from-scratch/core"
 
@@ -60,10 +61,24 @@ export const runAgentLoop = Effect.fn("runAgentLoop")(function* (
   while (step < MAX_STEPS) {
     step++
 
-    // 调 LLM：chatWithTools 返回 Promise，用 Effect.promise 桥接
-    const result = yield* Effect.promise(() =>
-      provider.chatWithTools(messages, toolList, callbacks.onChunk),
-    )
+    // 调 LLM：chatWithTools 返回 Promise，用 Effect.tryPromise 桥接
+    // 注意：为什么不用 Effect.promise？effect 会把 promise reject 的 Error
+    // 当作 defect（die）而不是 failure——defect 不受 mapError 影响，会直接
+    // 穿透导致无兜底崩溃（实测验证）。Effect.tryPromise 的 catch 回调能显式
+    // 把错误转成 failure（LLMError），让 runAgentLoop 的 E 类型明确，
+    // 上层可精确处理。
+    // （问题 1+2 修复：错误统一用 LLMError，不再裸 throw + 无兜底）
+    const result = yield* Effect.tryPromise({
+      try: () => provider.chatWithTools(messages, toolList, callbacks.onChunk),
+      catch: (e) => {
+        // e 是 unknown，TS 禁止 unknown instanceof，先断言成 Error
+        const error = e as Error
+        // 已经是 LLMError 就原样返回（不重复包装）；否则统一包成 LLMError
+        return error instanceof LLMError
+          ? error
+          : new LLMError({ message: error instanceof Error ? error.message : String(e) })
+      },
+    })
 
     if (result.toolCalls.length === 0) {
       const assistantMsg: Message = {
