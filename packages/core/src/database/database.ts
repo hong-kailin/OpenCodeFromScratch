@@ -93,23 +93,3 @@ export const databaseLayer = Layer.effect(
     })
   }),
 )
-
-// ── 过渡桥接：模块级 db 导出 ───────────────────────────────
-// 为什么需要它：
-//   session.ts / message.ts 还是模块级函数（16.6 才合并成 SessionStore 服务），
-//   模块级 async 函数没有 Context，无法 yield* DatabaseService 拿 db。
-//   所以这里从 Service 里"取出"db 再导出，让旧消费者 import { db } 继续工作。
-// 关键教学点（怎么把 Service 实例取出来）：
-//   DatabaseService              -- tag，拿服务的"钥匙"
-//   .pipe(Effect.map(s => s.db)) -- 从服务实例取 db 属性（得到 Effect<db>）
-//   Effect.provide(..., databaseLayer) -- 喂入实现（这里才触发建库）
-//   Effect.runSync               -- 同步执行（模块加载时跑一次）
-// 注意：这仍是"模块加载即建库"，但它只是【过渡】——真正消费 db 的新代码
-// （后续的 Effect 服务）会 yield* DatabaseService + provide 自定义 Layer，
-// 完全绕开这个桥接。16.6 SessionStore 服务化后会删掉这里。
-export const db = Effect.runSync(
-  Effect.provide(
-    DatabaseService.pipe(Effect.map((service) => service.db)),
-    databaseLayer,
-  ),
-)

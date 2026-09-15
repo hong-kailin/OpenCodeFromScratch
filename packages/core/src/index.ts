@@ -45,21 +45,17 @@ export {
   type FileSystemApi,
 } from "./filesystem"
 
-// ── 数据库与存储（阶段 5 起的模块级版本，16.2 起逐个服务化）─
+// ── 数据库与存储（16.2 Database 服务，16.6 SessionStore 服务）─
 export {
   DatabaseService,
   databaseLayer,
-  db, // 过渡桥接：16.6 SessionStore 服务化后移除
 } from "./database/database"
 export { sessionTable, messageTable } from "./database/sql"
-export type { Session } from "./session/session"
 export {
-  createSession,
-  listSessions,
-  getSession,
-  updateSession,
-} from "./session/session"
-export { saveMessage, loadMessages } from "./session/message"
+  SessionStore,
+  sessionStoreLayer,
+  type Session,
+} from "./session/store"
 
 // ── System Context（阶段 7 起的模块级版本）─────────────────
 export { buildSystemPrompt } from "./system-context"
