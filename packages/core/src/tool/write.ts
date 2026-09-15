@@ -5,9 +5,10 @@
 // 阶段 13 改动：参数定义从手写 JSON Schema 改为 Effect Schema（单一来源）
 // 阶段 16.4 改动：execute 改 Effect，文件操作走 FileSystem 服务（从 Context 取）
 
-import { Effect, Schema } from "effect"
+import { Effect, Layer, Schema } from "effect"
 import type { Tool } from "./tool"
 import { FileSystemService } from "../filesystem"
+import { ToolRegistry } from "./registry"
 import DESCRIPTION from "./write.txt"
 
 export const Parameters = Schema.Struct({
@@ -33,3 +34,11 @@ export const writeTool: Tool<typeof Parameters, FileSystemService> = {
   parameters: Parameters,
   execute,
 }
+
+// 自注册 Layer（16.5）：启动时把自己注册进 ToolRegistry
+export const writeToolLayer = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const registry = yield* ToolRegistry
+    registry.register(writeTool)
+  }),
+)

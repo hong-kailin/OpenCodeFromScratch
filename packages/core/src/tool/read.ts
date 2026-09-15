@@ -12,9 +12,10 @@
 // 现在：execute 内部 yield* FileSystemService，文件操作走服务（可替换实现）
 // 注意 execute 返回 Effect——这是"工具从 Context 取依赖"的前提。
 
-import { Effect, Schema } from "effect"
+import { Effect, Layer, Schema } from "effect"
 import type { Tool } from "./tool"
 import { FileSystemService } from "../filesystem"
+import { ToolRegistry } from "./registry"
 import DESCRIPTION from "./read.txt"
 
 // 参数定义：用 Effect Schema 描述 read 工具需要什么参数
@@ -69,3 +70,16 @@ export const readTool: Tool<typeof Parameters, FileSystemService> = {
   parameters: Parameters,
   execute,
 }
+
+// ── 自注册 Layer（阶段 16.5，对照 opencode 每个工具文件里的 layer）──
+// 每个工具在自己的文件里有一个 Layer，启动时 register 自己。
+// 组装方（入口的 toolsLayer）只要 merge 这个 Layer，
+// read 工具就会被注册进 ToolRegistry——不需要任何中央工具列表。
+// Layer.effectDiscard：效果执行完不留值（注册是副作用，没有返回值）
+export const readToolLayer = Layer.effectDiscard(
+  Effect.gen(function* () {
+    // 从 Context 取注册表，把自己注册进去
+    const registry = yield* ToolRegistry
+    registry.register(readTool)
+  }),
+)

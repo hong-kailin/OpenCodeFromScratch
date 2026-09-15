@@ -33,18 +33,41 @@ import {
   providerLayer,
   toolRegistryLayer,
   fileSystemLayer,
+  readToolLayer,
+  writeToolLayer,
+  editToolLayer,
+  bashToolLayer,
+  globToolLayer,
+  grepToolLayer,
 } from "@opencode-from-scratch/core"
 import { runAgentLoop } from "./agent-loop"
 
 // ── Layer 组装 ──────────────────────────────────────────────
 // providerLayer 依赖 ConfigService，所以要先喂给它
 // fileSystemLayer 不能少——16.4 起工具 execute 从 Context 取 FileSystem 服务
+//
+// 16.5 关键变化：工具列表不再集中定义（registry 空启动），
+// 工具各自的 Layer（readToolLayer 等）启动时 register 自己。
+// 组装方式（对照 11.3 课的"Layer 依赖 Layer"）：
+//   1. 先把 6 个工具 Layer mergeAll 成 toolsLayer
+//   2. 工具 Layer 依赖 ToolRegistry（register 需要），
+//      mergeAll 不会自动解析 Layer 依赖——必须显式 .pipe(Layer.provide(toolRegistryLayer))
+const toolsLayer = Layer.mergeAll(
+  readToolLayer,
+  writeToolLayer,
+  editToolLayer,
+  bashToolLayer,
+  globToolLayer,
+  grepToolLayer,
+).pipe(Layer.provide(toolRegistryLayer))
+
 const satisfiedProvider = providerLayer.pipe(Layer.provide(configLayer))
 const appLayers = Layer.mergeAll(
   configLayer,
   satisfiedProvider,
   toolRegistryLayer,
   fileSystemLayer,
+  toolsLayer,
 )
 
 // ── CLI 定义 ──────────────────────────────────────────────

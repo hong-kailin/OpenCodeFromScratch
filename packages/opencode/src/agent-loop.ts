@@ -84,7 +84,9 @@ export const runAgentLoop = Effect.fn("runAgentLoop")(function* (
     callbacks.onMessage?.(assistantMsg)
 
     for (const tc of result.toolCalls) {
-      const tool = toolList.find((t) => t.id === tc.function.name)
+      // 16.5：用 get 按 id 精确查找（不再 find 遍历）
+      // 注册表内部是 Map，get 是 O(1) 查找
+      const tool = tools.get(tc.function.name)
       callbacks.onToolCall(tc.id, tc.function.name, tc.function.arguments)
 
       let output: string

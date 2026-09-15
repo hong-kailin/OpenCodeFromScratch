@@ -7,9 +7,10 @@
 // 注意 Schema.optional：可选字段，execute 里类型是 boolean | null | undefined
 // 阶段 16.4 改动：execute 改 Effect，读/写都走 FileSystem 服务
 
-import { Effect, Schema } from "effect"
+import { Effect, Layer, Schema } from "effect"
 import type { Tool } from "./tool"
 import { FileSystemService } from "../filesystem"
+import { ToolRegistry } from "./registry"
 import DESCRIPTION from "./edit.txt"
 
 export const Parameters = Schema.Struct({
@@ -70,3 +71,11 @@ export const editTool: Tool<typeof Parameters, FileSystemService> = {
   parameters: Parameters,
   execute,
 }
+
+// 自注册 Layer（16.5）：启动时把自己注册进 ToolRegistry
+export const editToolLayer = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const registry = yield* ToolRegistry
+    registry.register(editTool)
+  }),
+)

@@ -30,12 +30,12 @@ export { createAnthropicProvider } from "./provider/anthropic"
 // ── 工具 ────────────────────────────────────────────────
 export type { Tool } from "./tool/tool"
 export { toJSONSchema, toolToOpenAIFormat } from "./tool/tool"
-export { readTool } from "./tool/read"
-export { writeTool } from "./tool/write"
-export { editTool } from "./tool/edit"
-export { bashTool } from "./tool/bash"
-export { globTool } from "./tool/glob"
-export { grepTool } from "./tool/grep"
+export { readTool, readToolLayer } from "./tool/read"
+export { writeTool, writeToolLayer } from "./tool/write"
+export { editTool, editToolLayer } from "./tool/edit"
+export { bashTool, bashToolLayer } from "./tool/bash"
+export { globTool, globToolLayer } from "./tool/glob"
+export { grepTool, grepToolLayer } from "./tool/grep"
 export { truncate } from "./tool/truncate"
 
 // ── Filesystem 服务（16.3）────────────────────────────────

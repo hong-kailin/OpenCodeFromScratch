@@ -6,9 +6,10 @@
 // include 是可选字段，用 Schema.optional
 // 阶段 16.4 改动：execute 改 Effect，grep 走 FileSystem 服务
 
-import { Effect, Schema } from "effect"
+import { Effect, Layer, Schema } from "effect"
 import type { Tool } from "./tool"
 import { FileSystemService } from "../filesystem"
+import { ToolRegistry } from "./registry"
 import DESCRIPTION from "./grep.txt"
 
 export const Parameters = Schema.Struct({
@@ -37,3 +38,11 @@ export const grepTool: Tool<typeof Parameters, FileSystemService> = {
   parameters: Parameters,
   execute,
 }
+
+// 自注册 Layer（16.5）：启动时把自己注册进 ToolRegistry
+export const grepToolLayer = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const registry = yield* ToolRegistry
+    registry.register(grepTool)
+  }),
+)

@@ -8,8 +8,9 @@
 //   注意：bash 不依赖 FileSystemService（用 Bun.spawn 直接跑命令），
 //   所以 R = never（不需要任何服务），Tool 泛型第二个参数不写即可。
 
-import { Effect, Schema } from "effect"
+import { Effect, Layer, Schema } from "effect"
 import type { Tool } from "./tool"
+import { ToolRegistry } from "./registry"
 import DESCRIPTION from "./bash.txt"
 
 export const Parameters = Schema.Struct({
@@ -70,3 +71,11 @@ export const bashTool: Tool<typeof Parameters> = {
   parameters: Parameters,
   execute,
 }
+
+// 自注册 Layer（16.5）：启动时把自己注册进 ToolRegistry
+export const bashToolLayer = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const registry = yield* ToolRegistry
+    registry.register(bashTool)
+  }),
+)
