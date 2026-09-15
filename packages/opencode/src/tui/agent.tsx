@@ -22,13 +22,20 @@ import {
   configLayer,
   providerLayer,
   toolRegistryLayer,
+  fileSystemLayer,
 } from "@opencode-from-scratch/core"
 import { runAgentLoop } from "../agent-loop"
 import type { Message } from "@opencode-from-scratch/schema"
 
 // Layer 组装：和 CLI 入口一样，providerLayer 依赖 ConfigService
+// fileSystemLayer 不能少——16.4 起工具 execute 从 Context 取 FileSystem 服务
 const satisfiedProvider = providerLayer.pipe(Layer.provide(configLayer))
-const appLayers = Layer.mergeAll(configLayer, satisfiedProvider, toolRegistryLayer)
+const appLayers = Layer.mergeAll(
+  configLayer,
+  satisfiedProvider,
+  toolRegistryLayer,
+  fileSystemLayer,
+)
 
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 

@@ -32,13 +32,20 @@ import {
   configLayer,
   providerLayer,
   toolRegistryLayer,
+  fileSystemLayer,
 } from "@opencode-from-scratch/core"
 import { runAgentLoop } from "./agent-loop"
 
 // ── Layer 组装 ──────────────────────────────────────────────
 // providerLayer 依赖 ConfigService，所以要先喂给它
+// fileSystemLayer 不能少——16.4 起工具 execute 从 Context 取 FileSystem 服务
 const satisfiedProvider = providerLayer.pipe(Layer.provide(configLayer))
-const appLayers = Layer.mergeAll(configLayer, satisfiedProvider, toolRegistryLayer)
+const appLayers = Layer.mergeAll(
+  configLayer,
+  satisfiedProvider,
+  toolRegistryLayer,
+  fileSystemLayer,
+)
 
 // ── CLI 定义 ──────────────────────────────────────────────
 

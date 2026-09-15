@@ -25,6 +25,7 @@ import {
   truncate,
   ProviderService,
   ToolRegistry,
+  FileSystemService,
   ToolError,
 } from "@opencode-from-scratch/core"
 
@@ -50,6 +51,9 @@ export const runAgentLoop = Effect.fn("runAgentLoop")(function* (
   // provider 和 tools 不再从参数传——从 Context 自取
   const provider = yield* ProviderService
   const tools = yield* ToolRegistry
+  // 16.4：工具 execute 从 Context 取 FileSystem 服务，这里先拿到实例
+  // （执行工具时 provideService 喂给它，详见下方 decodeAndRun）
+  const fs = yield* FileSystemService
   const toolList = tools.list()
 
   let step = 0
@@ -107,7 +111,15 @@ export const runAgentLoop = Effect.fn("runAgentLoop")(function* (
               (e) => new ToolError({ message: `工具 ${tool.id} 参数校验失败: ${String(e)}`, toolName: tool.id }),
             ),
             // 校验通过：args 类型安全，执行工具
-            Effect.flatMap((args) => Effect.promise(() => tool.execute(args))),
+            // 16.4：工具 execute 现在返回 Effect（需要 FileSystem 服务），
+            // 不再包 Effect.promise。但注意——注册表返回 Tool<any, any>，
+            // 工具的 R 泛型已经退化成 any（见 registry.ts 的说明），
+            // 这里运行时用 provideService 把 fs 显式喂进工具执行的 Context。
+            // 类型层面 provideService 对 any 无法收窄，所以在 runTool 的
+            // "最终结果"上断言 R=never（见下方），避免污染 runAgentLoop 的 R。
+            Effect.flatMap((args) =>
+              tool.execute(args).pipe(Effect.provideService(FileSystemService, fs)),
+            ),
           )
 
         const runTool = Effect.try({
@@ -121,6 +133,11 @@ export const runAgentLoop = Effect.fn("runAgentLoop")(function* (
           Effect.flatMap(decodeAndRun),
           // 兜底：任何失败（ToolError / execute 抛错）都转成错误文本，不中断 loop
           Effect.catch((e) => Effect.succeed(e instanceof Error ? e.message : String(e))),
+          // 关键：在这里（整个 runTool 的最终结果）把 R 从 any 断言成 never。
+          // Effect.gen/Effect.fn 有个已知特性：只要 yield* 的 Effect 的 R 是 any，
+          // 整个 generator 的 R 就退化成 any（污染）。所以必须收干净。
+          // 运行时工具需要的服务（FileSystem）已经在上面的 provideService 喂入。
+          (effect) => effect as Effect.Effect<string, never, never>,
         )
         output = yield* runTool
       }

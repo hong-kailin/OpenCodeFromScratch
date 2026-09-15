@@ -3,35 +3,31 @@
 // 对照 opencode: packages/opencode/src/tool/glob.ts（opencode 底层用 fast-glob 包）
 //
 // 阶段 13 改动：参数定义从手写 JSON Schema 改为 Effect Schema（单一来源）
+// 阶段 16.4 改动：execute 改 Effect，glob 走 FileSystem 服务（跳过规则在服务里统一管）
 
-import { Schema } from "effect"
+import { Effect, Schema } from "effect"
 import type { Tool } from "./tool"
+import { FileSystemService } from "../filesystem"
 import DESCRIPTION from "./glob.txt"
 
 export const Parameters = Schema.Struct({
   pattern: Schema.String.annotate({ description: "glob 模式（如 **/*.ts）" }),
 })
 
-async function execute(args: Schema.Schema.Type<typeof Parameters>): Promise<string> {
-  const { pattern } = args
+const execute = (args: Schema.Schema.Type<typeof Parameters>) =>
+  Effect.gen(function* () {
+    const { pattern } = args
 
-  // Bun.Glob：内置的文件模式匹配
-  // 类比 Python: glob.glob(pattern, recursive=True)
-  const glob = new Bun.Glob(pattern)
-  const paths: string[] = []
+    // 从 Context 取 FileSystem 服务，用服务 glob
+    // 跳过 node_modules/opencode 的逻辑收在服务里，工具不再重复写
+    const fs = yield* FileSystemService
+    const paths = yield* Effect.promise(() => fs.glob(pattern))
 
-  // scan(".") 从当前目录递归扫描
-  for await (const path of glob.scan(".")) {
-    // 跳过 node_modules 和 opencode 目录
-    if (path.startsWith("node_modules") || path.startsWith("opencode")) continue
-    paths.push(path)
-  }
+    if (paths.length === 0) return "没有找到匹配的文件"
+    return paths.join("\n")
+  })
 
-  if (paths.length === 0) return "没有找到匹配的文件"
-  return paths.join("\n")
-}
-
-export const globTool: Tool<typeof Parameters> = {
+export const globTool: Tool<typeof Parameters, FileSystemService> = {
   id: "glob",
   description: DESCRIPTION,
   parameters: Parameters,
