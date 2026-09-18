@@ -108,5 +108,6 @@ packages/
 ## 下一步
 
 阶段 16 收官。对照 [16.0 总览](../00-overview/01-overview.md) 里的路线图，
-接下来进入阶段 17（Session 事件溯源）——把 SessionStore 的直接 CRUD
-升级成 opencode 的"事件溯源 + 投影"，这是阶段 16 服务化地基之上最精巧的设计。
+接下来进入 [阶段 17：LLM Route 四轴模型](../../17-llm-route/00-problem-and-model/01-current-problem.md)，
+从当前 Provider 的职责耦合出发，先理解 Protocol、Endpoint、Auth、Framing 为什么需要分开。
+SessionStore 的事件溯源改造顺延到阶段 18；当前阶段继续复用直接 CRUD。

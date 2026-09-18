@@ -166,7 +166,7 @@ opencode 的 SSE 解析也做了同样的抽象（`opencode/packages/llm/src/rou
 它的 `Framing.sse.frame` 就是把"字节流 → 分帧"做成一条 Stream 变换
 （`frame: (bytes) => Stream`），和我们的管线思路一致。opencode 更进一步：
 把"分帧"（framing）从"协议解析"（protocol）里拆成独立的轴（Route 四轴之一），
-这是阶段 18 的内容。
+这是阶段 17 的内容。
 
 ## 教 debug：重构后怎么排查问题
 

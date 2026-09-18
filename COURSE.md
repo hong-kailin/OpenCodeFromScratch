@@ -571,7 +571,7 @@ opencode-from-scratch/
 
 > **目标**：把 chatWithTools 的流式输出从 ReadableStream 改成 Effect Stream，理解 Stream 的惰性拉取式异步序列和组合性。
 >
-> **为什么现在做**：当前流式输出用 ReadableStream 的 async iterator，能跑但不可组合。Effect Stream 提供丰富的组合子（map/filter/tap/runForEach/runFold），且与 Service/Layer 体系无缝衔接。这也是后续事件溯源（阶段 17）的基础——事件流本质就是 Stream。
+> **为什么现在做**：当前流式输出用 ReadableStream 的 async iterator，能跑但不可组合。Effect Stream 提供丰富的组合子（map/filter/tap/runForEach/runFold），且与 Service/Layer 体系无缝衔接。这也是后续事件溯源（阶段 18）的基础——事件流本质就是 Stream。
 
 #### 课程
 
@@ -599,7 +599,7 @@ opencode-from-scratch/
 - **14.3 阶段验收**
   - 验收：typecheck 通过、流式输出用 Effect Stream 驱动、CLI + TUI 都能跑
   - 工程思维：Stream 的组合性——把"流处理"变成声明式链式变换，而非命令式 for 循环
-  - 预告：Stream 是后续事件溯源（阶段 17）的地基
+  - 预告：Stream 是后续事件溯源（阶段 18）的地基
 
 #### 阶段产出
 
@@ -655,7 +655,7 @@ opencode-from-scratch/
 > - Filesystem 服务：封装文件读写、glob、grep
 > - Tool 注册表服务：工具的注册与查找
 > - SystemContext 服务：组装 system prompt
-> - Provider 服务：封装 LLM 调用（阶段 18 升级成 Route）
+> - Provider 服务：封装 LLM 调用（阶段 17 升级成 Route）
 > - 对照 opencode：`packages/core/src/` 的领域文件 + 同名子目录结构
 >
 > **产出**：`packages/{schema, core, opencode}` 三层结构，agent 通过 Context 取用 core 服务。
@@ -676,7 +676,45 @@ opencode-from-scratch/
 > - `Effect.promise` 会把 reject 的 Error 当 defect（die）而非 failure，mapError 不生效直接穿透——改用 `Effect.tryPromise` 的 catch 显式转 failure（LLMError）
 > - LLM 调用失败统一走 LLMError + CLI 优雅兜底，不再 unhandled rejection
 
-### 阶段 17：Session 事件溯源
+### 阶段 17：LLM Route 四轴模型——从 Codex 接入理解职责分解
+
+> **目标**：先解剖当前 Provider 的具体耦合，再把一次 LLM 调用拆成 Protocol、Endpoint、Auth、Framing 四种可独立变化的职责；用 `Route` 组合它们，最终以“OpenAI Responses + Codex Endpoint + OAuth + SSE”的方式接入 Codex 订阅。
+>
+> **为什么现在做**：火山 Coding Plan 到期，需要复用已有的 ChatGPT Codex 订阅。当前 `openai.ts` 把 URL、Bearer API key、Chat Completions 请求与响应、SSE 切流全部写在一个函数中。Codex 四个方面都与当前接入不完全相同；直接复制 Provider 只能得到第二份耦合代码，无法解释哪些部分应该共享。
+>
+> **核心问题**：现有 `Provider` 接口成功隔离了 Agent loop，却没有拆开 Provider 内部的调用流水线。阶段 17 要解决的是“怎样让一种变化只修改一个边界”，不是“怎样增加更多 providerID 分支”。
+
+#### 课程设计
+
+**17.0 问题地图与四轴概念（当前）**
+
+- [当前 Provider 到底出了什么问题](docs/17-llm-route/00-problem-and-model/01-current-problem.md)：沿真实代码定位 URL、认证、协议、分帧四类职责，说明粗粒度 Provider 为什么导致复制与同步修 bug。
+- [Route 四轴模型是什么](docs/17-llm-route/00-problem-and-model/02-four-axes.md)：定义 Protocol、Endpoint、Auth、Framing 的输入与输出，画出完整流水线，并用火山、Anthropic、Codex、Bedrock 矩阵说明“组合”与“复用”。
+- **本节不改代码**：先确认问题和目标模型，避免再次出现“先补字段，读者却不知道为什么”的情况。
+
+**17.1 下一节：先抽出 Framing**
+
+- 具体问题：当前按网络 chunk 执行 `split("\n")`，一条 SSE 事件跨 chunk 时会被拆坏。
+- 希望改进：建立 `bytes -> frames` 边界，让所有 SSE 协议共享正确的跨块缓冲。
+- 可观察结果：用人工切碎的相同 SSE 数据测试，无论 chunk 怎样切，输出帧都一致；Provider 行为不变。
+
+**后续主题范围**（只确定问题顺序，进入每节时再写正文和代码）：
+
+| 演进主题 | 当前具体问题 | 希望得到的边界 | 验证方式 |
+|---|---|---|---|
+| Endpoint 与 Auth | URL 拼接和 Bearer header 固定在 `fetch` 中 | URL 构造与认证应用可分别替换 | 同一协议更换 URL 或 header，body/解析代码不变 |
+| Protocol | 请求转换、JSON 校验、流事件累积混在 Provider | `LLMRequest -> provider body` 与 `frame -> LLMEvent` | OpenAI Chat fixture 能翻译成统一事件 |
+| Route 组合 | 分散部件还没有可执行入口 | `Route.make` 串起四轴 | 火山路线迁移后回归行为一致 |
+| Responses Protocol | 当前只认识 `choices[0].delta` | 独立的 OpenAI Responses 状态机 | 文本与工具调用 fixture 离线通过 |
+| OAuth 凭据 | `apiKey` 无法表达 access/refresh/expires | 独立 Auth 领域、持久化与刷新 | 过期凭据触发刷新，敏感数据不进项目配置 |
+| Codex Route | Codex 的四项选择尚未组合 | Responses + Codex Endpoint + OAuth + SSE | 真实订阅完成一次文本和工具调用 |
+| `llm` 拆包与源码对照 | Route 仍寄居 core | `packages/llm` 成为独立底层包 | 依赖方向、类型检查和阶段验收通过 |
+
+> **顺序调整**：原阶段 18 前移到 17，Session 事件溯源顺延到 18。Codex 接入可以复用阶段 16 的 SessionStore，不依赖事件溯源。
+
+> **产出**：`packages/{schema, core, llm, opencode}` 四层；火山和 Codex Route 复用能共享的轴，Agent loop 消费统一 LLMEvent。
+
+### 阶段 18：Session 事件溯源
 
 > **目标**：把 session 持久化从"直接 CRUD"重构成"事件溯源 + 投影"--所有状态变化先写成 durable event，再由 projector 投影成可查询视图。
 >
@@ -686,29 +724,12 @@ opencode-from-scratch/
 > - 事件元模型：Event.define（type + durable + data schema）
 > - EventV2 服务：publish（持久化+通知）、subscribe、project、replay
 > - 投影器：为每种事件注册投影函数，事件 -> DB 表
-> - 事件表 + 序列表 + 投影表（vs 我们的单表）
+> - 事件表 + 序列表 + 投影表（对照当前 session / message 两表的直接 CRUD）
 > - 从投影重建对话历史
 > - admit/promote 两阶段 prompt 投递
 > - 对照 opencode：`schema/src/session-event.ts`（30 种事件）、`core/src/session/projector.ts`
 >
 > **产出**：session 状态由事件流驱动，支持从事件重建、revert 回滚。
-
-### 阶段 18：LLM Route 四轴模型
-
-> **目标**：把简单 Provider 接口升级成 Route 四轴模型（Protocol + Endpoint + Auth + Framing），抽出独立的 `llm` 包。
->
-> **为什么现在做**：当前加一个新 provider 要复制粘贴整份代码，协议差异（OpenAI vs Anthropic）混在 Provider 实现里。opencode 的 Route 把"调一个 LLM API"分解成四个正交维度：Protocol（说哪种协议）、Endpoint（发去哪）、Auth（怎么认证）、Framing（怎么切流）。四轴组合后，DeepSeek/TogetherAI 等 OpenAI 兼容厂商只需几行复用同一 Protocol。
->
-> **核心主题**：
-> - Protocol：body schema + stream 状态机（把 provider event 翻译成通用 LLMEvent）
-> - Endpoint：声明式 URL 构造
-> - Auth：可组合的认证（bearer/header/config，支持 andThen/orElse）
-> - Framing：字节流 -> 帧（SSE / 二进制 event-stream）
-> - Route.make：四轴组合
-> - Provider Turn 完整流程：compile -> stream -> 状态机翻译
-> - 对照 opencode：`packages/llm/src/route/`、`packages/llm/AGENTS.md`
->
-> **产出**：`packages/{schema, core, llm, opencode}` 四层，多厂商 protocol 复用。
 
 ### 阶段 19：Server + Protocol + Client
 
@@ -832,8 +853,8 @@ opencode-from-scratch/
 | 14 | ReadableStream 不可组合 | Effect Stream |
 | 15 | 类型重复、边界模糊 | schema 契约层 + Bun workspaces |
 | 16 | 领域逻辑散乱 | core 领域服务化 |
-| 17 | 无法 revert/恢复/压缩 | Session 事件溯源 |
-| 18 | 加 provider 要复制粘贴 | LLM Route 四轴模型 |
+| 17 | Provider 内部四类变化耦合，接 Codex 只能复制 | LLM Route 四轴模型 |
+| 18 | 无法 revert/恢复/压缩 | Session 事件溯源 |
 | 19 | TUI 与 agent 耦合 | Server + Protocol + Client |
 | 20 | 工具能乱改无确认 | Permission 系统 |
 | 21 | 单 agent 干所有事 | Agent 定义 + Subagent |
@@ -842,7 +863,7 @@ opencode-from-scratch/
 | 24 | 长对话爆上下文 | Compaction + revert + plugin + LSP |
 | 25 | 只有 TUI | Web UI + Desktop |
 
-> **注意**：阶段 10-25 是路线图级规划，进入每个阶段前才细化具体课程内容（与阶段 0-9 一致的活文档原则）。顺序可能根据实际学习情况调整，但"动机驱动 + 渐进演进"的核心不变。
+> **注意**：未进入的阶段保持路线图级规划；已进入的阶段按实际代码细化。阶段 17、18 因 Codex 接入需求调整了顺序，"动机驱动 + 渐进演进"的核心不变。
 
 ## 当前状态
 
@@ -863,8 +884,8 @@ opencode-from-scratch/
 - [x] 阶段 14：Effect Stream（流式重写）
 - [x] 阶段 15：Monorepo 拆分 + Schema 契约层
 - [x] 阶段 16：Core 领域服务化
-- [ ] 阶段 17：Session 事件溯源
-- [ ] 阶段 18：LLM Route 四轴模型
+- [ ] 阶段 17：LLM Route 四轴模型（讲解到 17.0：问题地图与四轴概念，尚未修改代码）
+- [ ] 阶段 18：Session 事件溯源
 - [ ] 阶段 19：Server + Protocol + Client
 - [ ] 阶段 20：Permission 系统
 - [ ] 阶段 21：Agent 定义 + Subagent
@@ -873,4 +894,4 @@ opencode-from-scratch/
 - [ ] 阶段 24：Compaction + 高级特性
 - [ ] 阶段 25：Web UI + Desktop
 
-> **下一步**：阶段 0-16 已完成（三层 monorepo + core 7 个服务，agent loop 跑通）。阶段 17 把 session 持久化从"直接 CRUD"重构成"事件溯源 + 投影"——这是 opencode 最精巧的设计之一，也是 Effect Stream + Service 的最佳实践场。进入阶段 17 前先细化其课程内容。
+> **下一步**：阅读阶段 17.0，先确认当前 Provider 的具体耦合与 Route 四轴模型。下一节只抽出 Framing，并用跨 chunk SSE 测试证明边界有效；讲到哪写到哪。

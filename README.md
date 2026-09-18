@@ -106,8 +106,8 @@ AI 时代，一句"帮我写个 XXX"就能产出能跑的代码。但很快你�
 | 14 | ReadableStream 不可组合 | Effect Stream（流式重写） | ✅ |
 | 15 | 类型重复、边界模糊 | Monorepo 拆分 + Schema 契约层 | ✅ |
 | 16 | 领域逻辑散乱 | Core 领域服务化 | ✅ |
-| 17 | 无法 revert / 恢复 / 压缩 | Session 事件溯源 | ⏳ |
-| 18 | 加 provider 要复制粘贴 | LLM Route 四轴模型 | ⏳ |
+| 17 | Provider 内部四类变化耦合，接 Codex 只能复制 | LLM Route 四轴模型 | 🔧 |
+| 18 | 无法 revert / 恢复 / 压缩 | Session 事件溯源 | ⏳ |
 | 19 | TUI 与 agent 耦合 | Server + Protocol + Client | ⏳ |
 | 20 | 工具能乱改无确认 | Permission 系统 | ⏳ |
 | 21 | 单 agent 干所有事 | Agent 定义 + Subagent | ⏳ |
@@ -153,6 +153,9 @@ bun run tui            # TUI 终端界面
 ```
 
 `opencode.json` 配置示例：
+
+阶段 17 正在从 [当前 Provider 的具体问题](docs/17-llm-route/00-problem-and-model/01-current-problem.md)
+重新建立 LLM Route 四轴模型。当前只完成问题地图与概念讲解，项目代码仍保持阶段 16 行为。
 
 ```jsonc
 {

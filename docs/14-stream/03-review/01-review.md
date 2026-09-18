@@ -48,13 +48,13 @@ bun run src/tui/agent.tsx       # TUI：流式输出逐字渲染
 ReadableStream 是 Web 标准（浏览器/Node 的字节流），能做基本的异步迭代，
 但组合子少。Effect Stream 提供 `map/filter/tap/flatMap/runFold` 等丰富的组合子，
 并且和 Service/Layer 体系（阶段 11）无缝衔接——同属 Effect 生态。
-后续事件溯源（阶段 17）的本质就是"事件流"，用 Stream 表达最自然。
+后续事件溯源（阶段 18）的本质就是"事件流"，用 Stream 表达最自然。
 
 ## 预告：Stream 是事件溯源的地基
 
 opencode 的 session 用事件溯源：所有状态变化先写成事件（一个 Event 流），
 再由投影器应用到数据库。这个"事件流"本质上就是一条 Stream——
-阶段 17 会看到：`EventV2.publish` 发布事件 → `EventV2.subscribe` 订阅事件流 →
+阶段 18 会看到：`EventV2.publish` 发布事件 → `EventV2.subscribe` 订阅事件流 →
 投影器消费事件流。理解了 Stream 的惰性、组合、消费，就理解了事件溯源的一半。
 
 ## 阶段产出
@@ -68,4 +68,4 @@ src/
 
 对照 opencode：`opencode/packages/llm/src/route/framing.ts`（`Framing.sse` 把
 "字节流 → 分帧"做成 Stream 变换）、`opencode/packages/llm/src/protocols/shared.ts`。
-opencode 把 framing 从 protocol 拆成独立轴（Route 四轴之一），阶段 18 会讲。
+opencode 把 framing 从 protocol 拆成独立轴（Route 四轴之一），阶段 17 会讲。

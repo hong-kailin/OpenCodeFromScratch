@@ -169,11 +169,11 @@ bun run packages/opencode/src/index.ts run -c "刚才的问题你回答了什么
 | 我们 | opencode |
 |------|----------|
 | `SessionStore`（6 个方法） | `core/src/session/store.ts`（get/context/message 等方法） |
-| 直接 CRUD（insert/select） | 事件溯源：publish 事件 → projector 写库（阶段 17） |
+| 直接 CRUD（insert/select） | 事件溯源：publish 事件 → projector 写库（阶段 18） |
 | 依赖 `DatabaseService` | 依赖 `Database.Service` |
 
 opencode 的 SessionStore 建立在事件溯源之上（每个变更先写成事件再投影到表），
-我们目前还是直接 CRUD——阶段 17 会演进。
+我们目前还是直接 CRUD——阶段 18 会演进。
 
 ## 小结
 
