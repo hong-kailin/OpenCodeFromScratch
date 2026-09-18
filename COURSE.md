@@ -686,17 +686,18 @@ opencode-from-scratch/
 
 #### 课程设计
 
-**17.0 问题地图与四轴概念（当前）**
+**17.0 问题地图与四轴概念（已完成）**
 
 - [当前 Provider 到底出了什么问题](docs/17-llm-route/00-problem-and-model/01-current-problem.md)：沿真实代码定位 URL、认证、协议、分帧四类职责，说明粗粒度 Provider 为什么导致复制与同步修 bug。
 - [Route 四轴模型是什么](docs/17-llm-route/00-problem-and-model/02-four-axes.md)：定义 Protocol、Endpoint、Auth、Framing 的输入与输出，画出完整流水线，并用火山、Anthropic、Codex、Bedrock 矩阵说明“组合”与“复用”。
 - **本节不改代码**：先确认问题和目标模型，避免再次出现“先补字段，读者却不知道为什么”的情况。
 
-**17.1 下一节：先抽出 Framing**
+**17.1 先抽出 Framing（当前）**
 
-- 具体问题：当前按网络 chunk 执行 `split("\n")`，一条 SSE 事件跨 chunk 时会被拆坏。
+- [Framing：网络 chunk 不是事件边界](docs/17-llm-route/01-framing/01-framing.md)
+- 具体问题：原实现按网络 chunk 执行 `split("\n")`，一条 SSE 事件跨 chunk 时会被拆坏。
 - 希望改进：建立 `bytes -> frames` 边界，让所有 SSE 协议共享正确的跨块缓冲。
-- 可观察结果：用人工切碎的相同 SSE 数据测试，无论 chunk 怎样切，输出帧都一致；Provider 行为不变。
+- 可观察结果：可直接运行的 demo 分别演示跨 chunk JSON 和跨 chunk UTF-8 字符；Provider 行为不变。
 
 **后续主题范围**（只确定问题顺序，进入每节时再写正文和代码）：
 
@@ -884,7 +885,7 @@ opencode-from-scratch/
 - [x] 阶段 14：Effect Stream（流式重写）
 - [x] 阶段 15：Monorepo 拆分 + Schema 契约层
 - [x] 阶段 16：Core 领域服务化
-- [ ] 阶段 17：LLM Route 四轴模型（讲解到 17.0：问题地图与四轴概念，尚未修改代码）
+- [ ] 阶段 17：LLM Route 四轴模型（讲解到 17.1：抽出 SSE Framing 并修复跨 chunk 分帧）
 - [ ] 阶段 18：Session 事件溯源
 - [ ] 阶段 19：Server + Protocol + Client
 - [ ] 阶段 20：Permission 系统
@@ -894,4 +895,4 @@ opencode-from-scratch/
 - [ ] 阶段 24：Compaction + 高级特性
 - [ ] 阶段 25：Web UI + Desktop
 
-> **下一步**：阅读阶段 17.0，先确认当前 Provider 的具体耦合与 Route 四轴模型。下一节只抽出 Framing，并用跨 chunk SSE 测试证明边界有效；讲到哪写到哪。
+> **下一步**：阅读阶段 17.1，理解网络 chunk 与 SSE frame 为什么不是同一种边界。下一节再从当前代码的真实耦合中选择一个轴继续拆分；讲到哪写到哪。

@@ -7,7 +7,8 @@
 //
 // 阶段 14 改动：SSE 解析从"命令式 for await 循环"改成"Effect Stream 管线"
 // 之前：for await (const chunk of response.body!) { ... } 两层循环，逻辑混在一起
-// 现在：response.body → Stream 管线（解码→拆行→过滤data→去前缀→去[DONE]→JSON.parse）
+// 阶段 17.1 再把字节分帧抽成 sseFraming，修复 SSE 事件跨网络 chunk 时被拆坏的问题
+// 现在：response.body → sseFraming（字节→完整 payload）→ JSON.parse（协议语义）
 // 对外接口不变（chatWithTools 签名一样），agent-loop / CLI / TUI 都不用动
 
 import { Effect, Stream } from "effect"
@@ -17,6 +18,7 @@ import type { Tool } from "../tool/tool"
 import { toolToOpenAIFormat } from "../tool/tool"
 import { LLMError } from "../error/errors"
 import { debug } from "../debug"
+import { sseFraming } from "./framing"
 
 // 创建 OpenAI 兼容 Provider
 // config 由 loadConfig() 从 opencode.json 读取
@@ -74,35 +76,29 @@ export function createOpenAIProvider(config: {
         throw new LLMError({ message: "API 响应没有 body" })
       }
 
-      const decoder = new TextDecoder()
-
       // ═══════════════════════════════════════════════════════════
-      // SSE 解析：一条 Stream 管线（阶段 14 重构）
+      // SSE 解析：Framing + 当前 OpenAI 协议解析
       // ═══════════════════════════════════════════════════════════
       // response.body 是 ReadableStream<Uint8Array>，也是异步可迭代对象
       // （AsyncIterable），所以能直接用 Stream.fromAsyncIterable 接进来。
       //
-      // 管线一步步把"原始字节"变成"解析好的 delta 对象"：
-      //   1. fromAsyncIterable  字节流 → Stream<Uint8Array>
-      //   2. map(解码)          字节块 → 文本（TextDecoder，处理跨块字符）
-      //   3. flatMap(拆行)      文本 → 每行一个元素（flatMap 展开成多个）
-      //   4. filter(data 行)    只留 "data: " 开头的行（跳过空行/注释）
-      //   5. map(去前缀)        去掉 "data: " 得到原始数据
-      //   6. filter([DONE])     跳过结束标记
-      //   7. map(JSON.parse)    解析成对象
+      // 阶段 17.1 把管线分成了两层：
       //
-      // 整条管线是"惰性描述"——runForEach 消费时才真正拉取响应体。
-      // 每步只做一件事，可独立复用/测试，这是命令式 for 循环做不到的。
-      const sseDeltaStream = Stream.fromAsyncIterable(
+      // Framing 只判断事件边界：
+      //   1. fromAsyncIterable  字节流 → Stream<Uint8Array>
+      //   2. sseFraming         字节流 → 完整 data payload
+      //
+      // 当前 Provider 暂时继续承担 Protocol 的工作：
+      //   3. JSON.parse         payload → OpenAI 事件对象
+      //
+      // 旧代码对每个网络 chunk 直接 split("\n")，没有保存块末尾的半行。
+      // sseFraming 会跨 chunk 缓冲，只有收到 SSE 空行边界才输出完整 payload。
+      const byteStream = Stream.fromAsyncIterable(
         response.body,
         (cause) => new LLMError({ message: `读取流失败: ${String(cause)}` }),
-      ).pipe(
-        Stream.map((chunk) => decoder.decode(chunk, { stream: true })), // 字节 → 文本
-        Stream.flatMap((text) => Stream.fromIterable(text.split("\n"))), // 文本 → 行
-        Stream.filter((line) => line.startsWith("data: ")), // 只要 data 行
-        Stream.map((line) => line.slice(6)), // 去 "data: " 前缀
-        Stream.filter((data) => data !== "[DONE]"), // 去结束标记
-        Stream.map((data) => JSON.parse(data)), // 解析成对象
+      )
+      const sseDeltaStream = sseFraming.frame(byteStream).pipe(
+        Stream.map((data) => JSON.parse(data)),
       )
 
       // 累积状态：完整文本 + 工具调用（按 index 累积，arguments 分块拼接）

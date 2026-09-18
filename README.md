@@ -155,7 +155,8 @@ bun run tui            # TUI 终端界面
 `opencode.json` 配置示例：
 
 阶段 17 正在从 [当前 Provider 的具体问题](docs/17-llm-route/00-problem-and-model/01-current-problem.md)
-重新建立 LLM Route 四轴模型。当前只完成问题地图与概念讲解，项目代码仍保持阶段 16 行为。
+重新建立 LLM Route 四轴模型。目前讲到 [SSE Framing](docs/17-llm-route/01-framing/01-framing.md)：
+已修复网络 chunk 跨越 SSE 事件边界时的解析问题，其余三个轴尚未拆分。
 
 ```jsonc
 {
