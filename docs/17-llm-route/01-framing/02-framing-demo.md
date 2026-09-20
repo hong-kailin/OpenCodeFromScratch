@@ -17,7 +17,17 @@ bun run packages/core/src/provider/framing-demo.ts
 预期输出的关键部分是：
 
 ```text
---- JSON 跨 chunk ---
+=== 先复现旧管线的问题 ===
+
+收到 chunk 1:
+decode 后: "data: {\"choices\":[{\"del"
+split("\n") 后: [ '"data: {\\"choices\\":[{\\"del"' ]
+送进 JSON.parse: "{\"choices\":[{\"del"
+JSON.parse 失败: JSON Parse error: Unterminated string
+
+结论：chunk 1 的半截 JSON 被过早解析；chunk 2、3 又因为不以 data: 开头而被丢弃。
+
+--- 正确 Framing：JSON 跨 chunk ---
 Framing 输出: [ "{\"choices\":[{\"delta\":{\"content\":\"你好\"}}]}" ]
 结果符合预期
 
@@ -25,13 +35,34 @@ Framing 输出: [ "{\"choices\":[{\"delta\":{\"content\":\"你好\"}}]}" ]
 Framing 输出: [ "{\"text\":\"你\"}" ]
 结果符合预期
 
-两个 Framing demo 均通过
+旧问题已复现，两个正确 Framing demo 均通过
 ```
 
 如果结果不符合预期，程序会抛出 Error 并以非零状态结束，所以它也能帮助我们发现回归；这里只用
 普通控制流表达检查过程，暂时不引入测试框架的组织方式。
 
-## 第一部分：导入与类型
+## 第一部分：用旧管线稳定复现错误
+
+demo 先把同一个 SSE 事件固定拆成三个网络 chunk，再逐块执行旧逻辑：
+
+```ts
+const text = decoder.decode(chunk, { stream: true })
+const lines = text.split("\n")
+```
+
+第一块里没有 `\n`，但 `split("\n")` 并不会说“数据还没收完”，而是返回一个只包含原字符串的
+数组。这个半截字符串仍以 `data: ` 开头，于是旧管线立刻取出 payload 并调用 `JSON.parse`，得到
+“输入提前结束”一类的解析错误。当前 Bun 显示 `JSON Parse error: Unterminated string`；其他 JavaScript
+运行时也可能显示 `Unexpected end of JSON input`，错误文字不同，含义相同：JSON 还没有收完整。
+
+第二、三块虽然包含剩余内容，却已经没有开头的 `data: `，所以会被旧管线的 `filter` 丢弃。
+`TextDecoder` 不能挽救这里丢失的内容：它只缓存不完整的 UTF-8 字节，不知道 JSON、SSE 行或
+SSE 空行事件边界。
+
+为了让这段错误演示也能检查自身是否有效，函数会记录是否真的看到过解析错误；如果没有复现，
+反而会抛出异常。生产代码不会调用这段旧实现。
+
+## 第二部分：导入与类型
 
 ```ts
 import { Effect, Stream } from "effect"
@@ -57,7 +88,7 @@ function byteStream(chunks: Uint8Array[]): Stream.Stream<Uint8Array, LLMError> {
 数组本身不会失败，所以实际错误类型是 TypeScript 的 `never`。`never` 表示“不可能出现的值”，
 可以安全放到要求 `LLMError` 的位置。
 
-## 第二部分：把字符串变成网络字节
+## 第三部分：把字符串变成网络字节
 
 ```ts
 const encoder = new TextEncoder()
@@ -73,7 +104,7 @@ const chunks = [
 把 JavaScript 字符串编码成 UTF-8 `Uint8Array`。我们故意在 JSON 中间分成三个数组，用它模拟三次
 网络读取；这比等待真实网络碰巧这样切块更稳定。
 
-## 第三部分：真正执行 Effect Stream
+## 第四部分：真正执行 Effect Stream
 
 ```ts
 const frames = await Effect.runPromise(
@@ -89,7 +120,7 @@ const frames = await Effect.runPromise(
 
 前两层只是惰性描述。它类似先构造 async generator，再由事件循环真正消费。
 
-## 第四部分：检查输出
+## 第五部分：检查输出
 
 ```ts
 function assertFrames(actual: string[], expected: string[]) {
