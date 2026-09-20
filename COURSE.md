@@ -699,7 +699,7 @@ opencode-from-scratch/
 - 希望改进：建立 `bytes -> frames` 边界，让所有 SSE 协议共享正确的跨块缓冲。
 - 可观察结果：可直接运行的 demo 分别演示跨 chunk JSON 和跨 chunk UTF-8 字符；Provider 行为不变。
 
-**17.2 抽出 Endpoint（当前）**
+**17.2 抽出 Endpoint（已完成）**
 
 - [Endpoint：把“发到哪里”单独表达](docs/17-llm-route/02-endpoint/01-endpoint.md)
 - [读懂 Endpoint demo](docs/17-llm-route/02-endpoint/02-endpoint-demo.md)
@@ -707,11 +707,19 @@ opencode-from-scratch/
 - 希望改进：用 Endpoint 数据描述地址，只在 `renderEndpoint` 中构造最终 `URL`。
 - 可观察结果：demo 展示正常拼接、尾部斜杠归一化和更换 path；Provider 的其余行为不变。
 
+**17.3 抽出 Auth（当前）**
+
+- [Auth：把“凭什么被接受”单独表达](docs/17-llm-route/03-auth/01-auth.md)
+- [Auth 与 OAuth 分别解决什么问题](docs/17-llm-route/03-auth/02-auth-and-oauth.md)
+- [读懂 Auth demo](docs/17-llm-route/03-auth/03-auth-demo.md)
+- 具体问题：Bearer API key 与 Content-Type 一起写死在 Provider 的 `fetch` headers 中。
+- 希望改进：建立 `Headers -> Headers` 的最小 Auth 边界，让认证策略可以独立替换。
+- 可观察结果：demo 证明 Bearer Auth 保留基础 header、加入认证且不修改输入对象。
+
 **后续主题范围**（只确定问题顺序，进入每节时再写正文和代码）：
 
 | 演进主题 | 当前具体问题 | 希望得到的边界 | 验证方式 |
 |---|---|---|---|
-| Auth | Bearer header 固定在 `fetch` 中 | 认证应用可独立替换 | 更换 header 时，URL、body 和解析代码不变 |
 | Protocol | 请求转换、JSON 校验、流事件累积混在 Provider | `LLMRequest -> provider body` 与 `frame -> LLMEvent` | OpenAI Chat fixture 能翻译成统一事件 |
 | Route 组合 | 分散部件还没有可执行入口 | `Route.make` 串起四轴 | 火山路线迁移后回归行为一致 |
 | Responses Protocol | 当前只认识 `choices[0].delta` | 独立的 OpenAI Responses 状态机 | 文本与工具调用 fixture 离线通过 |
@@ -893,7 +901,7 @@ opencode-from-scratch/
 - [x] 阶段 14：Effect Stream（流式重写）
 - [x] 阶段 15：Monorepo 拆分 + Schema 契约层
 - [x] 阶段 16：Core 领域服务化
-- [ ] 阶段 17：LLM Route 四轴模型（讲解到 17.2：抽出 Endpoint 并统一 URL 构造）
+- [ ] 阶段 17：LLM Route 四轴模型（讲解到 17.3：抽出 Bearer Auth 并隔离认证 header）
 - [ ] 阶段 18：Session 事件溯源
 - [ ] 阶段 19：Server + Protocol + Client
 - [ ] 阶段 20：Permission 系统
@@ -903,4 +911,4 @@ opencode-from-scratch/
 - [ ] 阶段 24：Compaction + 高级特性
 - [ ] 阶段 25：Web UI + Desktop
 
-> **下一步**：阅读阶段 17.2，理解部署 baseURL 与路线 path 为什么需要分别表达。Endpoint 已拆出，Auth 与 Protocol 仍留在 Provider；讲到哪写到哪。
+> **下一步**：阅读阶段 17.3，理解认证策略与普通 HTTP header 为什么需要分开。Framing、Endpoint、Auth 已拆出，Protocol 仍留在 Provider；讲到哪写到哪。

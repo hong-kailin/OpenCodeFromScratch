@@ -200,4 +200,4 @@ opencode 是一个大型 TypeScript monorepo（31 个 package），技术栈为 
 
 见 [COURSE.md](./COURSE.md) 的"当前状态"部分。
 
-> **下一步**：阶段 0-16 已完成。当前阶段 17「LLM Route 四轴模型」讲解到 `docs/17-llm-route/02-endpoint/`（17.2）：已抽出 SSE Framing 与 Endpoint，并分别配有可运行 demo。Auth、Protocol 尚未拆分，四轴也尚未组合成 Route，后续继续讲到哪写到哪。原阶段 17「Session 事件溯源」顺延为阶段 18，阶段 19-25 编号不变。具体状态以 COURSE.md 为准。
+> **下一步**：阶段 0-16 已完成。当前阶段 17「LLM Route 四轴模型」讲解到 `docs/17-llm-route/03-auth/`（17.3）：已抽出 SSE Framing、Endpoint 与最小 Bearer Auth，并分别配有可运行 demo。Protocol 尚未拆分，四轴也尚未组合成 Route，后续继续讲到哪写到哪。原阶段 17「Session 事件溯源」顺延为阶段 18，阶段 19-25 编号不变。具体状态以 COURSE.md 为准。

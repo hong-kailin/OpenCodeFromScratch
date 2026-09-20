@@ -9,6 +9,7 @@
 // 之前：for await (const chunk of response.body!) { ... } 两层循环，逻辑混在一起
 // 阶段 17.1 再把字节分帧抽成 sseFraming，修复 SSE 事件跨网络 chunk 时被拆坏的问题
 // 阶段 17.2 把 URL 构造抽成 Endpoint，Provider 不再手写 baseURL + path
+// 阶段 17.3 把 Bearer header 构造抽成 Auth，Provider 只把 Auth 结果交给 fetch
 // 对外接口不变（chatWithTools 签名一样），agent-loop / CLI / TUI 都不用动
 
 import { Effect, Stream } from "effect"
@@ -21,6 +22,7 @@ import { debug } from "../debug"
 import { sseFraming } from "./framing"
 import type { Endpoint } from "./endpoint"
 import { renderEndpoint } from "./endpoint"
+import { bearerAuth } from "./auth"
 
 // 创建 OpenAI 兼容 Provider
 // config 由 loadConfig() 从 opencode.json 读取
@@ -37,6 +39,7 @@ export function createOpenAIProvider(config: {
     baseURL: config.baseURL,
     path: "/chat/completions",
   }
+  const auth = bearerAuth(config.apiKey)
 
   return {
     id: "openai",
@@ -49,6 +52,11 @@ export function createOpenAIProvider(config: {
       // 发流式请求（带 tools）
       // 调试：打印 API 请求详情（不打印 apiKey，安全考虑）
       const url = renderEndpoint(endpoint)
+      const headers = auth.apply(
+        new Headers({
+          "Content-Type": "application/json",
+        }),
+      )
 
       debug("API 请求:")
       debug(`  POST ${url.toString()}`)
@@ -59,10 +67,7 @@ export function createOpenAIProvider(config: {
 
       const response = await fetch(url, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${config.apiKey}`,
-        },
+        headers,
         body: JSON.stringify({
           model: config.modelID,
           stream: true,
