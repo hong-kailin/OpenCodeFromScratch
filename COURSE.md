@@ -692,18 +692,26 @@ opencode-from-scratch/
 - [Route 四轴模型是什么](docs/17-llm-route/00-problem-and-model/02-four-axes.md)：定义 Protocol、Endpoint、Auth、Framing 的输入与输出，画出完整流水线，并用火山、Anthropic、Codex、Bedrock 矩阵说明“组合”与“复用”。
 - **本节不改代码**：先确认问题和目标模型，避免再次出现“先补字段，读者却不知道为什么”的情况。
 
-**17.1 先抽出 Framing（当前）**
+**17.1 先抽出 Framing（已完成）**
 
 - [Framing：网络 chunk 不是事件边界](docs/17-llm-route/01-framing/01-framing.md)
 - 具体问题：原实现按网络 chunk 执行 `split("\n")`，一条 SSE 事件跨 chunk 时会被拆坏。
 - 希望改进：建立 `bytes -> frames` 边界，让所有 SSE 协议共享正确的跨块缓冲。
 - 可观察结果：可直接运行的 demo 分别演示跨 chunk JSON 和跨 chunk UTF-8 字符；Provider 行为不变。
 
+**17.2 抽出 Endpoint（当前）**
+
+- [Endpoint：把“发到哪里”单独表达](docs/17-llm-route/02-endpoint/01-endpoint.md)
+- [读懂 Endpoint demo](docs/17-llm-route/02-endpoint/02-endpoint-demo.md)
+- 具体问题：部署的 baseURL 与路线的 path 在 `fetch` 中直接拼接，斜杠规则、日志和请求地址容易分叉。
+- 希望改进：用 Endpoint 数据描述地址，只在 `renderEndpoint` 中构造最终 `URL`。
+- 可观察结果：demo 展示正常拼接、尾部斜杠归一化和更换 path；Provider 的其余行为不变。
+
 **后续主题范围**（只确定问题顺序，进入每节时再写正文和代码）：
 
 | 演进主题 | 当前具体问题 | 希望得到的边界 | 验证方式 |
 |---|---|---|---|
-| Endpoint 与 Auth | URL 拼接和 Bearer header 固定在 `fetch` 中 | URL 构造与认证应用可分别替换 | 同一协议更换 URL 或 header，body/解析代码不变 |
+| Auth | Bearer header 固定在 `fetch` 中 | 认证应用可独立替换 | 更换 header 时，URL、body 和解析代码不变 |
 | Protocol | 请求转换、JSON 校验、流事件累积混在 Provider | `LLMRequest -> provider body` 与 `frame -> LLMEvent` | OpenAI Chat fixture 能翻译成统一事件 |
 | Route 组合 | 分散部件还没有可执行入口 | `Route.make` 串起四轴 | 火山路线迁移后回归行为一致 |
 | Responses Protocol | 当前只认识 `choices[0].delta` | 独立的 OpenAI Responses 状态机 | 文本与工具调用 fixture 离线通过 |
@@ -885,7 +893,7 @@ opencode-from-scratch/
 - [x] 阶段 14：Effect Stream（流式重写）
 - [x] 阶段 15：Monorepo 拆分 + Schema 契约层
 - [x] 阶段 16：Core 领域服务化
-- [ ] 阶段 17：LLM Route 四轴模型（讲解到 17.1：抽出 SSE Framing 并修复跨 chunk 分帧）
+- [ ] 阶段 17：LLM Route 四轴模型（讲解到 17.2：抽出 Endpoint 并统一 URL 构造）
 - [ ] 阶段 18：Session 事件溯源
 - [ ] 阶段 19：Server + Protocol + Client
 - [ ] 阶段 20：Permission 系统
@@ -895,4 +903,4 @@ opencode-from-scratch/
 - [ ] 阶段 24：Compaction + 高级特性
 - [ ] 阶段 25：Web UI + Desktop
 
-> **下一步**：阅读阶段 17.1，理解网络 chunk 与 SSE frame 为什么不是同一种边界。下一节再从当前代码的真实耦合中选择一个轴继续拆分；讲到哪写到哪。
+> **下一步**：阅读阶段 17.2，理解部署 baseURL 与路线 path 为什么需要分别表达。Endpoint 已拆出，Auth 与 Protocol 仍留在 Provider；讲到哪写到哪。

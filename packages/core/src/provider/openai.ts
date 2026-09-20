@@ -8,7 +8,7 @@
 // 阶段 14 改动：SSE 解析从"命令式 for await 循环"改成"Effect Stream 管线"
 // 之前：for await (const chunk of response.body!) { ... } 两层循环，逻辑混在一起
 // 阶段 17.1 再把字节分帧抽成 sseFraming，修复 SSE 事件跨网络 chunk 时被拆坏的问题
-// 现在：response.body → sseFraming（字节→完整 payload）→ JSON.parse（协议语义）
+// 阶段 17.2 把 URL 构造抽成 Endpoint，Provider 不再手写 baseURL + path
 // 对外接口不变（chatWithTools 签名一样），agent-loop / CLI / TUI 都不用动
 
 import { Effect, Stream } from "effect"
@@ -19,6 +19,8 @@ import { toolToOpenAIFormat } from "../tool/tool"
 import { LLMError } from "../error/errors"
 import { debug } from "../debug"
 import { sseFraming } from "./framing"
+import type { Endpoint } from "./endpoint"
+import { renderEndpoint } from "./endpoint"
 
 // 创建 OpenAI 兼容 Provider
 // config 由 loadConfig() 从 opencode.json 读取
@@ -29,6 +31,13 @@ export function createOpenAIProvider(config: {
   apiKey: string
   modelID: string
 }): Provider {
+  // baseURL 来自用户配置；path 属于当前 OpenAI Chat 调用路线。
+  // 两者先组成 Endpoint，真正发请求时再统一渲染成 URL。
+  const endpoint: Endpoint = {
+    baseURL: config.baseURL,
+    path: "/chat/completions",
+  }
+
   return {
     id: "openai",
 
@@ -39,14 +48,16 @@ export function createOpenAIProvider(config: {
     ): Promise<ChatResult> {
       // 发流式请求（带 tools）
       // 调试：打印 API 请求详情（不打印 apiKey，安全考虑）
+      const url = renderEndpoint(endpoint)
+
       debug("API 请求:")
-      debug(`  POST ${config.baseURL}/chat/completions`)
+      debug(`  POST ${url.toString()}`)
       debug(`  model: ${config.modelID}`)
       debug(`  messages: ${messages.length} 条`)
       debug(`  tools: ${tools.map((t) => t.id).join(", ")}`)
       debug(`  stream: true`)
 
-      const response = await fetch(`${config.baseURL}/chat/completions`, {
+      const response = await fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
