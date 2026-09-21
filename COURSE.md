@@ -707,7 +707,7 @@ opencode-from-scratch/
 - 希望改进：用 Endpoint 数据描述地址，只在 `renderEndpoint` 中构造最终 `URL`。
 - 可观察结果：demo 展示正常拼接、尾部斜杠归一化和更换 path；Provider 的其余行为不变。
 
-**17.3 抽出 Auth（当前）**
+**17.3 抽出 Auth（已完成）**
 
 - [Auth：把“凭什么被接受”单独表达](docs/17-llm-route/03-auth/01-auth.md)
 - [Auth 与 OAuth 分别解决什么问题](docs/17-llm-route/03-auth/02-auth-and-oauth.md)
@@ -716,11 +716,20 @@ opencode-from-scratch/
 - 希望改进：建立 `Headers -> Headers` 的最小 Auth 边界，让认证策略可以独立替换。
 - 可观察结果：demo 证明 Bearer Auth 保留基础 header、加入认证且不修改输入对象。
 
+**17.4 Protocol：请求与响应的双向翻译（当前）**
+
+- [Protocol 的完整边界](docs/17-llm-route/04-protocol/01-protocol.md)
+- [请求方向：LLMRequest → Body](docs/17-llm-route/04-protocol/02-protocol-request.md)
+- [响应方向：Frame → LLMEvent](docs/17-llm-route/04-protocol/03-protocol-response.md)
+- [运行完整 Protocol demo](docs/17-llm-route/04-protocol/04-protocol-demo.md)
+- 具体问题：`chatWithTools` 同时决定 OpenAI Chat 请求 body，又解析 `choices[0].delta` 并拼接跨帧工具参数。
+- 希望改进：用一个双向 Protocol 建立 `LLMRequest -> Body` 与 `Frame -> LLMEvent` 两条翻译边界。
+- 可观察结果：同一个离线 demo 依次展示请求转换、响应状态机和运行时 Schema 校验。
+
 **后续主题范围**（只确定问题顺序，进入每节时再写正文和代码）：
 
 | 演进主题 | 当前具体问题 | 希望得到的边界 | 验证方式 |
 |---|---|---|---|
-| Protocol | 请求转换、JSON 校验、流事件累积混在 Provider | `LLMRequest -> provider body` 与 `frame -> LLMEvent` | OpenAI Chat fixture 能翻译成统一事件 |
 | Route 组合 | 分散部件还没有可执行入口 | `Route.make` 串起四轴 | 火山路线迁移后回归行为一致 |
 | Responses Protocol | 当前只认识 `choices[0].delta` | 独立的 OpenAI Responses 状态机 | 文本与工具调用 fixture 离线通过 |
 | OAuth 凭据 | `apiKey` 无法表达 access/refresh/expires | 独立 Auth 领域、持久化与刷新 | 过期凭据触发刷新，敏感数据不进项目配置 |
@@ -901,7 +910,7 @@ opencode-from-scratch/
 - [x] 阶段 14：Effect Stream（流式重写）
 - [x] 阶段 15：Monorepo 拆分 + Schema 契约层
 - [x] 阶段 16：Core 领域服务化
-- [ ] 阶段 17：LLM Route 四轴模型（讲解到 17.3：抽出 Bearer Auth 并隔离认证 header）
+- [ ] 阶段 17：LLM Route 四轴模型（讲解到 17.4：抽出双向 Protocol）
 - [ ] 阶段 18：Session 事件溯源
 - [ ] 阶段 19：Server + Protocol + Client
 - [ ] 阶段 20：Permission 系统
@@ -911,4 +920,4 @@ opencode-from-scratch/
 - [ ] 阶段 24：Compaction + 高级特性
 - [ ] 阶段 25：Web UI + Desktop
 
-> **下一步**：阅读阶段 17.3，理解认证策略与普通 HTTP header 为什么需要分开。Framing、Endpoint、Auth 已拆出，Protocol 仍留在 Provider；讲到哪写到哪。
+> **下一步**：阅读阶段 17.4，先建立 Protocol 是双向翻译器的整体认识，再分别理解请求转换、运行时 Schema、跨帧 State 与通用 LLMEvent。四个轴仍由 Provider 分别选择；讲到哪写到哪。

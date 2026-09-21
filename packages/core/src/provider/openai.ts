@@ -10,19 +10,21 @@
 // 阶段 17.1 再把字节分帧抽成 sseFraming，修复 SSE 事件跨网络 chunk 时被拆坏的问题
 // 阶段 17.2 把 URL 构造抽成 Endpoint，Provider 不再手写 baseURL + path
 // 阶段 17.3 把 Bearer header 构造抽成 Auth，Provider 只把 Auth 结果交给 fetch
+// 阶段 17.4 把请求 body 转换、响应校验、delta 翻译和工具参数拼接统一抽进 Protocol
 // 对外接口不变（chatWithTools 签名一样），agent-loop / CLI / TUI 都不用动
 
 import { Effect, Stream } from "effect"
 import type { Provider, ChatResult } from "./interface"
 import type { Message, ToolCall } from "@opencode-from-scratch/schema"
 import type { Tool } from "../tool/tool"
-import { toolToOpenAIFormat } from "../tool/tool"
 import { LLMError } from "../error/errors"
 import { debug } from "../debug"
 import { sseFraming } from "./framing"
 import type { Endpoint } from "./endpoint"
 import { renderEndpoint } from "./endpoint"
 import { bearerAuth } from "./auth"
+import { openAIChatProtocol } from "./openai-chat-protocol"
+import type { LLMEvent } from "./protocol"
 
 // 创建 OpenAI 兼容 Provider
 // config 由 loadConfig() 从 opencode.json 读取
@@ -57,6 +59,11 @@ export function createOpenAIProvider(config: {
           "Content-Type": "application/json",
         }),
       )
+      const body = openAIChatProtocol.encodeRequest({
+        modelID: config.modelID,
+        messages,
+        tools,
+      })
 
       debug("API 请求:")
       debug(`  POST ${url.toString()}`)
@@ -68,12 +75,7 @@ export function createOpenAIProvider(config: {
       const response = await fetch(url, {
         method: "POST",
         headers,
-        body: JSON.stringify({
-          model: config.modelID,
-          stream: true,
-          messages,
-          tools: tools.map(toolToOpenAIFormat),
-        }),
+        body: JSON.stringify(body),
       })
 
       if (!response.ok) {
@@ -93,97 +95,55 @@ export function createOpenAIProvider(config: {
       }
 
       // ═══════════════════════════════════════════════════════════
-      // SSE 解析：Framing + 当前 OpenAI 协议解析
+      // SSE 响应流水线：Framing + Protocol
       // ═══════════════════════════════════════════════════════════
       // response.body 是 ReadableStream<Uint8Array>，也是异步可迭代对象
       // （AsyncIterable），所以能直接用 Stream.fromAsyncIterable 接进来。
       //
-      // 阶段 17.1 把管线分成了两层：
-      //
-      // Framing 只判断事件边界：
+      // Framing 只判断事件边界，Protocol 只理解事件内容：
       //   1. fromAsyncIterable  字节流 → Stream<Uint8Array>
       //   2. sseFraming         字节流 → 完整 data payload
-      //
-      // 当前 Provider 暂时继续承担 Protocol 的工作：
-      //   3. JSON.parse         payload → OpenAI 事件对象
-      //
-      // 旧代码对每个网络 chunk 直接 split("\n")，没有保存块末尾的半行。
-      // sseFraming 会跨 chunk 缓冲，只有收到 SSE 空行边界才输出完整 payload。
+      //   3. Protocol decode    payload → 经过 Schema 校验的 OpenAI event
+      //   4. Protocol step      OpenAI event → 通用 LLMEvent
       const byteStream = Stream.fromAsyncIterable(
         response.body,
         (cause) => new LLMError({ message: `读取流失败: ${String(cause)}` }),
       )
-      const sseDeltaStream = sseFraming.frame(byteStream).pipe(
-        Stream.map((data) => JSON.parse(data)),
-      )
+      const frameStream = sseFraming.frame(byteStream)
 
-      // 累积状态：完整文本 + 工具调用（按 index 累积，arguments 分块拼接）
-      // 为什么用 Map？因为 LLM 可能同时调多个工具，用 index 区分（0, 1, 2...）
-      // 每个 tool_call 的 arguments 是分块到达的，要拼接
+      // Provider 现在只累积项目通用结果。它不再读取 choices[0].delta，
+      // 也不知道 OpenAI 的工具 arguments 会按 index 分成多帧。
       let fullText = ""
-      const toolCallsMap = new Map<number, { id: string; name: string; arguments: string }>()
+      const toolCalls: ToolCall[] = []
+      let protocolState = openAIChatProtocol.response.initial()
 
-      // 消费管线：对每个解析出的 delta 做副作用（onChunk 回调 + 累积状态）
-      // 对照原来的 for await 循环：这里的逻辑一模一样，但"遍历"由 Stream 驱动
+      const consume = (event: LLMEvent) => {
+        if (event.type === "text-delta") {
+          debug(`LLM event: text-delta="${event.text}"`)
+          onChunk(event.text)
+          fullText += event.text
+          return
+        }
+
+        debug(`LLM event: tool-call id=${event.toolCall.id} name=${event.toolCall.function.name}`)
+        toolCalls.push(event.toolCall)
+      }
+
+      // step 每处理一帧就返回“新状态 + 本帧产生的通用事件”。
+      // 跨帧工具参数被保存在 protocolState 内，而不是泄漏给 Provider。
       await Effect.runPromise(
-        Stream.runForEach(sseDeltaStream, (json) =>
+        Stream.runForEach(frameStream, (frame) =>
           Effect.sync(() => {
-            const delta = json.choices?.[0]?.delta
-
-            // 调试：打印每个 SSE delta 的关键信息
-            if (delta?.content) {
-              debug(`SSE delta: content="${delta.content}"`)
-            }
-            if (delta?.tool_calls) {
-              for (const tc of delta.tool_calls) {
-                if (tc.id) {
-                  debug(`SSE delta: tool_call 新建 index=${tc.index} id=${tc.id} name=${tc.function?.name}`)
-                } else {
-                  debug(`SSE delta: tool_call 追加 index=${tc.index} args="${tc.function?.arguments}"`)
-                }
-              }
-            }
-
-            // 1. 处理文本增量
-            const content = delta?.content
-            if (content) {
-              onChunk(content)
-              fullText += content
-            }
-
-            // 2. 处理工具调用增量
-            // tool_calls 的 arguments 是分块流式到达的：
-            // 第一个 delta：有 id 和 name，arguments 是空字符串
-            // 后续 delta：只有 arguments 的片段，要拼接
-            if (delta?.tool_calls) {
-              for (const tc of delta.tool_calls) {
-                const existing = toolCallsMap.get(tc.index)
-                if (existing) {
-                  // 已有：拼接 arguments 片段
-                  if (tc.function?.arguments) existing.arguments += tc.function.arguments
-                } else {
-                  // 新的：记录 id 和 name
-                  toolCallsMap.set(tc.index, {
-                    id: tc.id,
-                    name: tc.function?.name || "",
-                    arguments: tc.function?.arguments || "",
-                  })
-                }
-              }
-            }
+            const vendorEvent = openAIChatProtocol.response.decodeFrame(frame)
+            const result = openAIChatProtocol.response.step(protocolState, vendorEvent)
+            protocolState = result.state
+            result.events.forEach(consume)
           }),
         ),
       )
 
-      // 把 Map 转成数组
-      const toolCalls: ToolCall[] = Array.from(toolCallsMap.values()).map((tc) => ({
-        id: tc.id,
-        type: "function" as const,
-        function: {
-          name: tc.name,
-          arguments: tc.arguments,
-        },
-      }))
+      // 流结束是一个有业务含义的边界：此时 Protocol 才能确认工具参数已经完整。
+      openAIChatProtocol.response.finish(protocolState).forEach(consume)
 
       debug(`SSE 流结束: 文本 ${fullText.length} 字符, ${toolCalls.length} 个工具调用`)
 
