@@ -11,6 +11,7 @@
 // 阶段 17.2 把 URL 构造抽成 Endpoint，Provider 不再手写 baseURL + path
 // 阶段 17.3 把 Bearer header 构造抽成 Auth，Provider 只把 Auth 结果交给 fetch
 // 阶段 17.4 把请求 body 转换、响应校验、delta 翻译和工具参数拼接统一抽进 Protocol
+// 阶段 17.5 用 Route 装配四轴，Provider 只负责 HTTP 调用和 ChatResult 累积
 // 对外接口不变（chatWithTools 签名一样），agent-loop / CLI / TUI 都不用动
 
 import { Effect, Stream } from "effect"
@@ -19,12 +20,8 @@ import type { Message, ToolCall } from "@opencode-from-scratch/schema"
 import type { Tool } from "../tool/tool"
 import { LLMError } from "../error/errors"
 import { debug } from "../debug"
-import { sseFraming } from "./framing"
-import type { Endpoint } from "./endpoint"
-import { renderEndpoint } from "./endpoint"
-import { bearerAuth } from "./auth"
-import { openAIChatProtocol } from "./openai-chat-protocol"
 import type { LLMEvent } from "./protocol"
+import { createOpenAIChatRoute } from "./openai-chat-route"
 
 // 创建 OpenAI 兼容 Provider
 // config 由 loadConfig() 从 opencode.json 读取
@@ -35,13 +32,11 @@ export function createOpenAIProvider(config: {
   apiKey: string
   modelID: string
 }): Provider {
-  // baseURL 来自用户配置；path 属于当前 OpenAI Chat 调用路线。
-  // 两者先组成 Endpoint，真正发请求时再统一渲染成 URL。
-  const endpoint: Endpoint = {
+  // 具体四轴组合只在 Route 定义中出现。Provider 选择的是一条已经装配好的路线。
+  const route = createOpenAIChatRoute({
     baseURL: config.baseURL,
-    path: "/chat/completions",
-  }
-  const auth = bearerAuth(config.apiKey)
+    apiKey: config.apiKey,
+  })
 
   return {
     id: "openai",
@@ -53,29 +48,24 @@ export function createOpenAIProvider(config: {
     ): Promise<ChatResult> {
       // 发流式请求（带 tools）
       // 调试：打印 API 请求详情（不打印 apiKey，安全考虑）
-      const url = renderEndpoint(endpoint)
-      const headers = auth.apply(
-        new Headers({
-          "Content-Type": "application/json",
-        }),
-      )
-      const body = openAIChatProtocol.encodeRequest({
+      const prepared = route.prepare({
         modelID: config.modelID,
         messages,
         tools,
       })
 
       debug("API 请求:")
-      debug(`  POST ${url.toString()}`)
+      debug(`  route: ${route.id}`)
+      debug(`  POST ${prepared.url.toString()}`)
       debug(`  model: ${config.modelID}`)
       debug(`  messages: ${messages.length} 条`)
       debug(`  tools: ${tools.map((t) => t.id).join(", ")}`)
       debug(`  stream: true`)
 
-      const response = await fetch(url, {
+      const response = await fetch(prepared.url, {
         method: "POST",
-        headers,
-        body: JSON.stringify(body),
+        headers: prepared.headers,
+        body: prepared.body,
       })
 
       if (!response.ok) {
@@ -95,28 +85,24 @@ export function createOpenAIProvider(config: {
       }
 
       // ═══════════════════════════════════════════════════════════
-      // SSE 响应流水线：Framing + Protocol
+      // SSE 响应流水线：Route
       // ═══════════════════════════════════════════════════════════
       // response.body 是 ReadableStream<Uint8Array>，也是异步可迭代对象
       // （AsyncIterable），所以能直接用 Stream.fromAsyncIterable 接进来。
       //
-      // Framing 只判断事件边界，Protocol 只理解事件内容：
+      // Route 内部已经把 Framing 和 Protocol 串好：
       //   1. fromAsyncIterable  字节流 → Stream<Uint8Array>
-      //   2. sseFraming         字节流 → 完整 data payload
-      //   3. Protocol decode    payload → 经过 Schema 校验的 OpenAI event
-      //   4. Protocol step      OpenAI event → 通用 LLMEvent
+      //   2. route.events       字节流 → 通用 LLMEvent
       const byteStream = Stream.fromAsyncIterable(
         response.body,
         (cause) => new LLMError({ message: `读取流失败: ${String(cause)}` }),
       )
-      const frameStream = sseFraming.frame(byteStream)
+      const eventStream = route.events(byteStream)
 
       // Provider 现在只累积项目通用结果。它不再读取 choices[0].delta，
       // 也不知道 OpenAI 的工具 arguments 会按 index 分成多帧。
       let fullText = ""
       const toolCalls: ToolCall[] = []
-      let protocolState = openAIChatProtocol.response.initial()
-
       const consume = (event: LLMEvent) => {
         if (event.type === "text-delta") {
           debug(`LLM event: text-delta="${event.text}"`)
@@ -129,21 +115,9 @@ export function createOpenAIProvider(config: {
         toolCalls.push(event.toolCall)
       }
 
-      // step 每处理一帧就返回“新状态 + 本帧产生的通用事件”。
-      // 跨帧工具参数被保存在 protocolState 内，而不是泄漏给 Provider。
       await Effect.runPromise(
-        Stream.runForEach(frameStream, (frame) =>
-          Effect.sync(() => {
-            const vendorEvent = openAIChatProtocol.response.decodeFrame(frame)
-            const result = openAIChatProtocol.response.step(protocolState, vendorEvent)
-            protocolState = result.state
-            result.events.forEach(consume)
-          }),
-        ),
+        Stream.runForEach(eventStream, (event) => Effect.sync(() => consume(event))),
       )
-
-      // 流结束是一个有业务含义的边界：此时 Protocol 才能确认工具参数已经完整。
-      openAIChatProtocol.response.finish(protocolState).forEach(consume)
 
       debug(`SSE 流结束: 文本 ${fullText.length} 字符, ${toolCalls.length} 个工具调用`)
 

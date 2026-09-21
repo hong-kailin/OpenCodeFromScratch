@@ -716,7 +716,7 @@ opencode-from-scratch/
 - 希望改进：建立 `Headers -> Headers` 的最小 Auth 边界，让认证策略可以独立替换。
 - 可观察结果：demo 证明 Bearer Auth 保留基础 header、加入认证且不修改输入对象。
 
-**17.4 Protocol：请求与响应的双向翻译（当前）**
+**17.4 Protocol：请求与响应的双向翻译（已完成）**
 
 - [Protocol 的完整边界](docs/17-llm-route/04-protocol/01-protocol.md)
 - [请求方向：LLMRequest → Body](docs/17-llm-route/04-protocol/02-protocol-request.md)
@@ -726,11 +726,18 @@ opencode-from-scratch/
 - 希望改进：用一个双向 Protocol 建立 `LLMRequest -> Body` 与 `Frame -> LLMEvent` 两条翻译边界。
 - 可观察结果：同一个离线 demo 依次展示请求转换、响应状态机和运行时 Schema 校验。
 
+**17.5 Route：把四轴装配成一条路线（当前）**
+
+- [Route：独立的零件还需要一个装配点](docs/17-llm-route/05-route/01-route.md)
+- [运行 Route demo](docs/17-llm-route/05-route/02-route-demo.md)
+- 具体问题：四个边界虽然独立，Provider 仍亲自选择零件、排列请求与响应 pipeline。
+- 希望改进：用 `makeRoute` 建立 `prepare / events` 两个可执行入口，并集中声明 OpenAI Chat 四轴组合。
+- 可观察结果：离线 demo 通过同一条 Route 准备请求并把任意网络 chunk 翻译成通用事件。
+
 **后续主题范围**（只确定问题顺序，进入每节时再写正文和代码）：
 
 | 演进主题 | 当前具体问题 | 希望得到的边界 | 验证方式 |
 |---|---|---|---|
-| Route 组合 | 分散部件还没有可执行入口 | `Route.make` 串起四轴 | 火山路线迁移后回归行为一致 |
 | Responses Protocol | 当前只认识 `choices[0].delta` | 独立的 OpenAI Responses 状态机 | 文本与工具调用 fixture 离线通过 |
 | OAuth 凭据 | `apiKey` 无法表达 access/refresh/expires | 独立 Auth 领域、持久化与刷新 | 过期凭据触发刷新，敏感数据不进项目配置 |
 | Codex Route | Codex 的四项选择尚未组合 | Responses + Codex Endpoint + OAuth + SSE | 真实订阅完成一次文本和工具调用 |
@@ -910,7 +917,7 @@ opencode-from-scratch/
 - [x] 阶段 14：Effect Stream（流式重写）
 - [x] 阶段 15：Monorepo 拆分 + Schema 契约层
 - [x] 阶段 16：Core 领域服务化
-- [ ] 阶段 17：LLM Route 四轴模型（讲解到 17.4：抽出双向 Protocol）
+- [ ] 阶段 17：LLM Route 四轴模型（讲解到 17.5：用 Route 组合四轴）
 - [ ] 阶段 18：Session 事件溯源
 - [ ] 阶段 19：Server + Protocol + Client
 - [ ] 阶段 20：Permission 系统
@@ -920,4 +927,4 @@ opencode-from-scratch/
 - [ ] 阶段 24：Compaction + 高级特性
 - [ ] 阶段 25：Web UI + Desktop
 
-> **下一步**：阅读阶段 17.4，先建立 Protocol 是双向翻译器的整体认识，再分别理解请求转换、运行时 Schema、跨帧 State 与通用 LLMEvent。四个轴仍由 Provider 分别选择；讲到哪写到哪。
+> **下一步**：阅读阶段 17.5，理解为什么“零件已经解耦”仍需要 Route 统一装配，以及请求级 State 为什么不能放在可复用的 Route 对象上。当前 OpenAI Provider 已迁移到 Route，后续继续讲到哪写到哪。

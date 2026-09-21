@@ -155,8 +155,8 @@ bun run tui            # TUI 终端界面
 `opencode.json` 配置示例：
 
 阶段 17 正在从 [当前 Provider 的具体问题](docs/17-llm-route/00-problem-and-model/01-current-problem.md)
-重新建立 LLM Route 四轴模型。目前讲到 [Protocol 双向翻译](docs/17-llm-route/04-protocol/01-protocol.md)：
-已拆出 SSE Framing、Endpoint、Bearer Auth，以及同时处理请求与响应的 Protocol。
+重新建立 LLM Route 四轴模型。目前讲到 [Route 四轴装配](docs/17-llm-route/05-route/01-route.md)：
+已拆出 SSE Framing、Endpoint、Bearer Auth 和双向 Protocol，并用 Route 将四者组合为一条 OpenAI Chat 路线。
 
 ```jsonc
 {
