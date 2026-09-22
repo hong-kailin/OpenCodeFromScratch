@@ -69,7 +69,7 @@ function runResponseDirection() {
   ]
 
   let state = openAIChatProtocol.response.initial()
-  const events: LLMEvent[] = []
+  const llmEvents: LLMEvent[] = []
 
   // frame 必须按到达顺序更新 state，因此这里使用顺序明确的 for...of。
   for (const frame of frames) {
@@ -78,26 +78,26 @@ function runResponseDirection() {
     const result = openAIChatProtocol.response.step(state, vendorEvent)
 
     state = result.state
-    events.push(...result.events)
+    llmEvents.push(...result.llmEvents)
 
     console.log("收到 frame:", frame)
-    console.log("本帧通用事件:", result.events)
+    console.log("本帧通用 LLMEvent:", result.llmEvents)
   }
 
   // 工具调用只有在流结束后才能确认参数完整，所以 finish 才发布 tool-call 事件。
-  events.push(...openAIChatProtocol.response.finish(state))
+  llmEvents.push(...openAIChatProtocol.response.finish(state))
 
   let text = ""
   const toolCalls: ToolCall[] = []
 
   // 从这里开始，消费方只认识通用 LLMEvent，不再读取 choices[0].delta。
-  for (const event of events) {
-    if (event.type === "text-delta") {
-      text += event.text
+  for (const llmEvent of llmEvents) {
+    if (llmEvent.type === "text-delta") {
+      text += llmEvent.text
       continue
     }
 
-    toolCalls.push(event.toolCall)
+    toolCalls.push(llmEvent.toolCall)
   }
 
   console.log("Protocol 输出:")

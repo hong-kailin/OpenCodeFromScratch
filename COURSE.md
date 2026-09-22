@@ -720,8 +720,9 @@ opencode-from-scratch/
 
 - [Protocol 的完整边界](docs/17-llm-route/04-protocol/01-protocol.md)
 - [请求方向：LLMRequest → Body](docs/17-llm-route/04-protocol/02-protocol-request.md)
-- [响应方向：Frame → LLMEvent](docs/17-llm-route/04-protocol/03-protocol-response.md)
-- [运行完整 Protocol demo](docs/17-llm-route/04-protocol/04-protocol-demo.md)
+- [Event 到底是什么](docs/17-llm-route/04-protocol/03-event.md)
+- [响应方向：Frame → LLMEvent](docs/17-llm-route/04-protocol/04-protocol-response.md)
+- [运行完整 Protocol demo](docs/17-llm-route/04-protocol/05-protocol-demo.md)
 - 具体问题：`chatWithTools` 同时决定 OpenAI Chat 请求 body，又解析 `choices[0].delta` 并拼接跨帧工具参数。
 - 希望改进：用一个双向 Protocol 建立 `LLMRequest -> Body` 与 `Frame -> LLMEvent` 两条翻译边界。
 - 可观察结果：同一个离线 demo 依次展示请求转换、响应状态机和运行时 Schema 校验。

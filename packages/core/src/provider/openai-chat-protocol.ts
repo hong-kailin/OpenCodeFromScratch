@@ -76,12 +76,12 @@ export const openAIChatProtocol: Protocol<
 
     initial: () => ({ toolCalls: new Map() }),
 
-    step: (state, event) => {
-      const delta = event.choices[0]?.delta
-      const events: LLMEvent[] = []
+    step: (state, vendorEvent) => {
+      const delta = vendorEvent.choices[0]?.delta
+      const llmEvents: LLMEvent[] = []
 
       if (delta?.content) {
-        events.push({ type: "text-delta", text: delta.content })
+        llmEvents.push({ type: "text-delta", text: delta.content })
       }
 
       // 每一步复制 Map，再把当前 frame 的参数片段拼进去。
@@ -98,7 +98,7 @@ export const openAIChatProtocol: Protocol<
 
       return {
         state: { toolCalls },
-        events,
+        llmEvents,
       }
     },
 

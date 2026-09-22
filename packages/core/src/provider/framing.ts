@@ -30,7 +30,7 @@ export const sseFraming: Framing<string> = {
       // SSE 的 retry: 指令要求客户端稍后重连。当前简化版还没有重连机制，
       // 所以和真实 opencode 的 Framing 一样先忽略这类控制事件。
       Stream.catchTag("Retry", () => Stream.empty),
-      Stream.filter((event) => event.data.length > 0 && event.data !== "[DONE]"),
-      Stream.map((event) => event.data),
+      Stream.filter((sseEvent) => sseEvent.data.length > 0 && sseEvent.data !== "[DONE]"),
+      Stream.map((sseEvent) => sseEvent.data),
     ),
 }

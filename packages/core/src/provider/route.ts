@@ -17,7 +17,7 @@ export interface PreparedRouteRequest {
   readonly body: string
 }
 
-// Route 对使用方隐藏厂商 Body、Event 和 State 类型。只有 makeRoute 在装配时
+// Route 对使用方隐藏厂商 Body、VendorEvent 和 State 类型。只有 makeRoute 在装配时
 // 需要这些泛型，以保证 Framing 的输出正好能交给 Protocol 的输入。
 export interface Route {
   readonly id: string
@@ -27,16 +27,16 @@ export interface Route {
   ) => Stream.Stream<LLMEvent, LLMError>
 }
 
-export interface MakeRouteInput<Body, Frame, Event, State> {
+export interface MakeRouteInput<Body, Frame, VendorEvent, State> {
   readonly id: string
-  readonly protocol: Protocol<Body, Frame, Event, State>
+  readonly protocol: Protocol<Body, Frame, VendorEvent, State>
   readonly endpoint: Endpoint
   readonly auth: Auth
   readonly framing: Framing<Frame>
 }
 
-export function makeRoute<Body, Frame, Event, State>(
-  input: MakeRouteInput<Body, Frame, Event, State>,
+export function makeRoute<Body, Frame, VendorEvent, State>(
+  input: MakeRouteInput<Body, Frame, VendorEvent, State>,
 ): Route {
   return {
     id: input.id,
@@ -68,7 +68,7 @@ export function makeRoute<Body, Frame, Event, State>(
             const vendorEvent = input.protocol.response.decodeFrame(frame)
             const result = input.protocol.response.step(state, vendorEvent)
             state = result.state
-            return Stream.fromIterable(result.events)
+            return Stream.fromIterable(result.llmEvents)
           }),
         )
 

@@ -1,4 +1,4 @@
-# 17.4.3 运行完整 Protocol demo
+# 17.4.4 运行完整 Protocol demo
 
 > 对照代码：[protocol-demo.ts](../../../packages/core/src/provider/protocol-demo.ts)
 
@@ -47,13 +47,13 @@ demo 中的工具仍必须提供 `execute`，因为项目内部 `Tool` 类型要
 const vendorEvent = openAIChatProtocol.response.decodeFrame(frame)
 const result = openAIChatProtocol.response.step(state, vendorEvent)
 state = result.state
-events.push(...result.events)
+llmEvents.push(...result.llmEvents)
 ```
 
-`events.push(...items)` 类似 Python 的 `events.extend(items)`。所有 frame 结束后，再调用：
+`llmEvents.push(...items)` 类似 Python 的 `events.extend(items)`。所有 frame 结束后，再调用：
 
 ```ts
-events.push(...openAIChatProtocol.response.finish(state))
+llmEvents.push(...openAIChatProtocol.response.finish(state))
 ```
 
 此时才会得到 arguments 为 `{"path":"README.md"}` 的完整工具调用。
@@ -81,7 +81,7 @@ demo 最后故意传入合法 JSON、错误结构：
 
 - `SyntaxError`：JSON 字符串本身不完整或语法错误；
 - Schema 错误：JSON 能解析，但结构不符合当前 Protocol；
-- Schema 通过但通用事件错误：进入 `step` 检查 state 和 events。
+- Schema 通过但通用事件错误：进入 `step` 检查 state 和 llmEvents。
 
 这种分层排查可以区分“流切坏了”“厂商格式变了”和“状态机拼错了”。demo 末尾的普通 `if` 检查
 负责在结果不符合预期时抛出 Error；当前课程还没有引入 TS 测试框架，因此继续使用可直接运行的脚本。

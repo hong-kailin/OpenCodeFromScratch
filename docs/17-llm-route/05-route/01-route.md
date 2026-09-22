@@ -36,9 +36,9 @@ Protocol。
 ## Route 表达一条完整路线
 
 ```ts
-export interface MakeRouteInput<Body, Frame, Event, State> {
+export interface MakeRouteInput<Body, Frame, VendorEvent, State> {
   readonly id: string
-  readonly protocol: Protocol<Body, Frame, Event, State>
+  readonly protocol: Protocol<Body, Frame, VendorEvent, State>
   readonly endpoint: Endpoint
   readonly auth: Auth
   readonly framing: Framing<Frame>
@@ -75,6 +75,9 @@ Auth       -> Headers
 ```text
 字节流 -> Framing -> Frame -> Protocol 状态机 -> LLMEvent
 ```
+
+这里的 Frame、VendorEvent、LLMEvent 分别处于不同层次；如果这些名字还容易混淆，先阅读
+[Event 到底是什么](../04-protocol/03-event.md)。
 
 这样 Provider 不再操作四个零件，只负责中间稳定的 HTTP 调用，并把通用事件累积成旧接口需要的
 `ChatResult`。

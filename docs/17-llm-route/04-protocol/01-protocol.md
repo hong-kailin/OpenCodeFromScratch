@@ -48,10 +48,10 @@ Provider 才能真正不认识 `model`、`choices[0].delta` 等协议细节。
 ## 完整接口
 
 ```ts
-export interface Protocol<Body, Frame, Event, State> {
+export interface Protocol<Body, Frame, VendorEvent, State> {
   readonly id: string
   readonly encodeRequest: (request: LLMRequest) => Body
-  readonly response: ProtocolResponse<Frame, Event, State>
+  readonly response: ProtocolResponse<Frame, VendorEvent, State>
 }
 ```
 
@@ -61,10 +61,10 @@ export interface Protocol<Body, Frame, Event, State> {
 |---|---|
 | `Body` | 发给服务器的请求对象 |
 | `Frame` | Framing 输出的完整 JSON 字符串 |
-| `Event` | 经过 Schema 校验的厂商事件 |
+| `VendorEvent` | 经过 Schema 校验的厂商事件 |
 | `State` | 跨 frame 保存的工具调用片段 |
 
-可以类比 Python 的 `Generic[Body, Frame, Event, State]`：接口先描述这些类型之间的关系，具体实现再
+可以类比 Python 的 `Generic[Body, Frame, VendorEvent, State]`：接口先描述这些类型之间的关系，具体实现再
 决定每个类型的真实形状。
 
 ## 为什么这一课同时讲两个方向
@@ -76,8 +76,9 @@ State 类型。
 所以本课按一个完整问题组织，但把不同阅读重点拆成几篇短文：
 
 1. [请求方向](02-protocol-request.md)：`LLMRequest -> Body`；
-2. [响应方向](03-protocol-response.md)：`Frame -> LLMEvent` 状态机；
-3. [统一 demo](04-protocol-demo.md)：在一次运行中观察完整双向翻译。
+2. [Event 到底是什么](03-event.md)：区分 chunk、Frame、VendorEvent、LLMEvent 和最终结果；
+3. [响应方向](04-protocol-response.md)：`Frame -> LLMEvent` 状态机；
+4. [统一 demo](05-protocol-demo.md)：在一次运行中观察完整双向翻译。
 
 ## Protocol 不负责什么
 

@@ -1,4 +1,4 @@
-# 17.4.2 Protocol 响应方向：Frame → LLMEvent
+# 17.4.3 Protocol 响应方向：Frame → LLMEvent
 
 > 对照代码：
 > [protocol.ts](../../../packages/core/src/provider/protocol.ts)、
@@ -42,6 +42,8 @@ decodeFrame: (frame) => decodeOpenAIChatEvent(JSON.parse(frame))
 
 ## 通用 LLMEvent
 
+上一节已经区分了 SSE event、VendorEvent 和 LLMEvent。这里继续看 OpenAIChatEvent 怎样被状态机翻译。
+
 ```ts
 type LLMEvent =
   | { type: "text-delta"; text: string }
@@ -67,7 +69,7 @@ frame 2: index=0,                            arguments="README.md"}
 片段，并让 `step` 显式返回新状态：
 
 ```ts
-step(state, event) -> { state, events }
+step(state, vendorEvent) -> { state, llmEvents }
 ```
 
 这就是最小状态机：根据“旧状态 + 当前输入”计算“新状态 + 输出”。这里不需要 class，也不需要额外
@@ -93,5 +95,5 @@ if (event.type === "text-delta") {
 toolCalls.push(event.toolCall)
 ```
 
-如果文本错误，观察 `step` 产出的 events；如果工具参数缺字，观察 step 前后的 state；如果连完整
+如果文本错误，观察 `step` 产出的 llmEvents；如果工具参数缺字，观察 step 前后的 state；如果连完整
 payload 都没有，回到 Framing 排查。每个边界对应一种问题，Debug 时不必再从整个 Provider 猜起。

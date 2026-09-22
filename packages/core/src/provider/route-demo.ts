@@ -65,20 +65,20 @@ const sse = [
 const bytes = new TextEncoder().encode(sse)
 const chunks = [bytes.slice(0, 31), bytes.slice(31, 97), bytes.slice(97, 181), bytes.slice(181)]
 const byteStream = Stream.fromIterable(chunks)
-const events = Array.from(
+const llmEvents = Array.from(
   await Effect.runPromise(Stream.runCollect(route.events(byteStream))),
 )
 
-console.log("通用事件:")
-console.log(events)
+console.log("通用 LLMEvent:")
+console.log(llmEvents)
 
-const text = events
-  .filter((event) => event.type === "text-delta")
-  .map((event) => event.text)
+const text = llmEvents
+  .filter((llmEvent) => llmEvent.type === "text-delta")
+  .map((llmEvent) => llmEvent.text)
   .join("")
-const toolCalls: ToolCall[] = events
-  .filter((event) => event.type === "tool-call")
-  .map((event) => event.toolCall)
+const toolCalls: ToolCall[] = llmEvents
+  .filter((llmEvent) => llmEvent.type === "tool-call")
+  .map((llmEvent) => llmEvent.toolCall)
 
 if (text !== "开始读取。") {
   throw new Error(`Route 输出文本错误: ${text}`)

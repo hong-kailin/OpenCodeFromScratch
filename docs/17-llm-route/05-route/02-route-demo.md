@@ -58,6 +58,8 @@ route.events(Stream.fromIterable(chunks))
 内部先由 Framing 恢复完整 SSE payload，再由 Protocol 校验 OpenAI event、翻译文本、拼接工具参数。
 最终调用方只看到：
 
+> 这些层次的完整区别见 [Event 到底是什么](../04-protocol/03-event.md)。
+
 ```text
 text-delta("开始读取。")
 tool-call(read, {"path":"README.md"})

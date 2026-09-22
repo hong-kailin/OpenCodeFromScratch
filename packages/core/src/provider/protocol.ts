@@ -15,7 +15,8 @@ export interface LLMRequest {
   readonly tools: Tool[]
 }
 
-// Protocol 屏蔽厂商事件格式以后，只向 Provider 交付这两种通用结果。
+// LLMEvent 是项目内部的通用事件。Protocol 屏蔽厂商事件格式以后，
+// 只向 Provider 交付这两种结构，不暴露 choices[0].delta 等厂商字段。
 // type 是“可辨识联合”的标签，Provider 可以用 switch 安全地缩小类型。
 export type LLMEvent =
   | {
@@ -30,22 +31,22 @@ export type LLMEvent =
 // 一帧厂商事件可能更新跨帧状态，也可能产出一个或多个通用事件。
 export interface ProtocolStep<State> {
   readonly state: State
-  readonly events: LLMEvent[]
+  readonly llmEvents: LLMEvent[]
 }
 
-// Frame 是 Framing 输出的完整 payload；Event 是运行时校验后的厂商事件；
+// Frame 是 Framing 输出的完整 payload；VendorEvent 是运行时校验后的厂商事件；
 // State 保存工具参数等不能从单帧独立得到的信息。
-export interface ProtocolResponse<Frame, Event, State> {
-  readonly decodeFrame: (frame: Frame) => Event
+export interface ProtocolResponse<Frame, VendorEvent, State> {
+  readonly decodeFrame: (frame: Frame) => VendorEvent
   readonly initial: () => State
-  readonly step: (state: State, event: Event) => ProtocolStep<State>
+  readonly step: (state: State, vendorEvent: VendorEvent) => ProtocolStep<State>
   readonly finish: (state: State) => LLMEvent[]
 }
 
 // 四个泛型分别描述协议自己的请求 body、输入 frame、厂商事件和跨帧状态。
-// 它们都来自具体协议实现，不需要 import 某个叫 Body/Frame/Event/State 的类型。
-export interface Protocol<Body, Frame, Event, State> {
+// 它们都来自具体协议实现，不需要 import 某个叫 Body/Frame/VendorEvent/State 的类型。
+export interface Protocol<Body, Frame, VendorEvent, State> {
   readonly id: string
   readonly encodeRequest: (request: LLMRequest) => Body
-  readonly response: ProtocolResponse<Frame, Event, State>
+  readonly response: ProtocolResponse<Frame, VendorEvent, State>
 }

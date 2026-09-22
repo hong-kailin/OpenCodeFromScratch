@@ -103,20 +103,20 @@ export function createOpenAIProvider(config: {
       // 也不知道 OpenAI 的工具 arguments 会按 index 分成多帧。
       let fullText = ""
       const toolCalls: ToolCall[] = []
-      const consume = (event: LLMEvent) => {
-        if (event.type === "text-delta") {
-          debug(`LLM event: text-delta="${event.text}"`)
-          onChunk(event.text)
-          fullText += event.text
+      const consume = (llmEvent: LLMEvent) => {
+        if (llmEvent.type === "text-delta") {
+          debug(`LLM event: text-delta="${llmEvent.text}"`)
+          onChunk(llmEvent.text)
+          fullText += llmEvent.text
           return
         }
 
-        debug(`LLM event: tool-call id=${event.toolCall.id} name=${event.toolCall.function.name}`)
-        toolCalls.push(event.toolCall)
+        debug(`LLM event: tool-call id=${llmEvent.toolCall.id} name=${llmEvent.toolCall.function.name}`)
+        toolCalls.push(llmEvent.toolCall)
       }
 
       await Effect.runPromise(
-        Stream.runForEach(eventStream, (event) => Effect.sync(() => consume(event))),
+        Stream.runForEach(eventStream, (llmEvent) => Effect.sync(() => consume(llmEvent))),
       )
 
       debug(`SSE 流结束: 文本 ${fullText.length} 字符, ${toolCalls.length} 个工具调用`)
